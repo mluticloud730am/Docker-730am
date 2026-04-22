@@ -37,8 +37,325 @@ custome ami created and ASG is their to take care and it will be done
 now main concept is where we create these instrtuction so we create a file called docker fileto created with all instruction 
 
 
+
+
+
+So ec2 server application need to dpeloyed in conatiner 
+
+so make it ready artifcat 
+
 so thsi is containerxzation platfomr so we need to give instryctoin in docker file when you build docker file 
 
 
 lets understand each instrcution which we given docker file 
+
+so in ec 2 we have user data right so in ec2 inside conatiner instructions similar 
+
+
+so our target is creating image and handing over to ASG launtemplate etc 
+
+so instructions given to create artifact 
+
+so take base os from docker 
+
+Docker file -- it is text file where we can write instructions to create image
+
+docker file name always D should be captial 
+
+Dockerfile create this file 
+write below 
+
+FROM amazonlinux  --- pull image from docker repo
+
+
+docker build -t imag1 .
+
+docker build -t imag1 . -f filename  -- if docker filname is differnet from standard one 
+
+
+[root@ip-172-31-25-85 ~]# docker build -t im1 .
+[+] Building 4.7s (5/5) FINISHED                                                                                                                                                                    docker:default
+ => [internal] load build definition from Dockerfile                                                                                                                                                          0.0s
+ => => transferring dockerfile: 114B                                                                                                                                                                          0.0s
+ => [internal] load metadata for docker.io/library/amazonlinux:latest                                                                                                                                         0.3s
+ => [internal] load .dockerignore                                                                                                                                                                             0.0s
+ => => transferring context: 2B                                                                                                                                                                               0.0s
+ => [1/1] FROM docker.io/library/amazonlinux:latest@sha256:cfa6c2d0270c6517c0e46cb87aed7edcae8d9eb96af5f51814b6ee8680faaa2c                                                                                   4.3s
+ => => resolve docker.io/library/amazonlinux:latest@sha256:cfa6c2d0270c6517c0e46cb87aed7edcae8d9eb96af5f51814b6ee8680faaa2c                                                                                   0.0s
+ => => sha256:558b71737b5e0f6d2c7cbfabd855a209750443d0c3dd894b30d9c086d45fcc87 1.02kB / 1.02kB                                                                                                                0.0s
+ => => sha256:d33197f6c987453b520aed4472559c6da96d45005c227c8d99af54c96076110f 586B / 586B                                                                                                                    0.0s
+ => => sha256:f24558f24158eae4a7e3aceff47ef1d2c507935ec782c707d42d4166d9c76fca 54.57MB / 54.57MB                                                                                                              0.6s
+ => => sha256:cfa6c2d0270c6517c0e46cb87aed7edcae8d9eb96af5f51814b6ee8680faaa2c 2.38kB / 2.38kB                                                                                                                0.0s
+ => => extracting sha256:f24558f24158eae4a7e3aceff47ef1d2c507935ec782c707d42d4166d9c76fca                                                                                                                     3.5s
+ => exporting to image                                                                                                                                                                                        0.0s
+ => => exporting layers                                                                                                                                                                                       0.0s
+ => => writing image sha256:fefa4365d92dc62dad2162deecf1dff0ce44dc2b58952ed57220ddd3f8239680                                                                                                                  0.0s
+ => => naming to docker.io/library/im1                                                                                                                                                                        0.0s
+[root@ip-172-31-25-85 ~]# docker images 
+REPOSITORY   TAG       IMAGE ID       CREATED      SIZE
+im1          latest    fefa4365d92d   6 days ago   150MB
+[root@ip-172-31-25-85 ~]# cat Dockerfile
+FROM amazonlinux
+
+if you give number of instructions given to docker image size will be increased 
+
+
+so can give like this 
+
+RUN yum update -y && yum install python3-pip -y
+~                                                     
+
+------------------------
+
+[root@ip-172-31-25-85 ~]# vi Dockerfile 
+[root@ip-172-31-25-85 ~]# docker build -t im1 .
+[+] Building 20.6s (6/6) FINISHED                                                                                                                                                                   docker:default
+ => [internal] load build definition from Dockerfile                                                                                                                                                          0.0s
+ => => transferring dockerfile: 163B                                                                                                                                                                          0.0s
+ => [internal] load metadata for docker.io/library/amazonlinux:latest                                                                                                                                         0.2s
+ => [internal] load .dockerignore                                                                                                                                                                             0.0s
+ => => transferring context: 2B                                                                                                                                                                               0.0s
+ => CACHED [1/2] FROM docker.io/library/amazonlinux:latest@sha256:cfa6c2d0270c6517c0e46cb87aed7edcae8d9eb96af5f51814b6ee8680faaa2c                                                                            0.0s
+ => [2/2] RUN yum update -y && yum install python3-pip -y                                                                                                                                                    19.4s
+ => exporting to image                                                                                                                                                                                        0.9s 
+ => => exporting layers                                                                                                                                                                                       0.9s 
+ => => writing image sha256:c6538cef971ef01beb325df938f7ef40bce0c724ea0b3be7e9b84d1d96d914e7                                                                                                                  0.0s 
+ => => naming to docker.io/library/im1                                                                                                                                                                        0.0s 
+[root@ip-172-31-25-85 ~]# cat Dockerfile 
+FROM amazonlinux                                                                                                                                                                                                   
+RUN yum update -y && yum install python3-pip -y
+
+[root@ip-172-31-25-85 ~]# docker images
+REPOSITORY   TAG       IMAGE ID       CREATED          SIZE
+im1          latest    c6538cef971e   24 seconds ago   298MB
+<none>       <none>    fefa4365d92d   6 days ago       150MB
+[root@ip-172-31-25-85 ~]# docker run -it im1
+bash-5.2# python3 --version
+Python 3.9.25
+bash-5.2# pip
+
+Usage:   
+  pip <command> [options]
+
+Commands:
+  install                     Install packages.
+  download                    Download packages.
+  uninstall                   Uninstall packages.
+  freeze                      Output installed packages in requirements format.
+  list                        List installed packages.
+  show                        Show information about installed packages.
+  check                       Verify installed packages have compatible dependencies.
+  config                      Manage local and global configuration.
+  search                      Search PyPI for packages.
+  cache                       Inspect and manage pip's wheel cache.
+  index                       Inspect information available from package indexes.
+  wheel                       Build wheels from your requirements.
+  hash                        Compute hashes of package archives.
+  completion                  A helper command used for command completion.
+  debug                       Show information useful for debugging.
+  help                        Show help for commands.
+
+General Options:
+  -h, --help                  Show help.
+  --debug                     Let unhandled exceptions propagate outside the main subroutine, instead of logging them to stderr.
+  --isolated                  Run pip in an isolated mode, ignoring environment variables and user configuration.
+  -v, --verbose               Give more output. Option is additive, and can be used up to 3 times.
+  -V, --version               Show version and exit.
+  -q, --quiet                 Give less output. Option is additive, and can be used up to 3 times (corresponding to WARNING, ERROR, and CRITICAL logging levels).
+  --log <path>                Path to a verbose appending log.
+  --no-input                  Disable prompting for input.
+  --proxy <proxy>             Specify a proxy in the form [user:passwd@]proxy.server:port.
+  --retries <retries>         Maximum number of retries each connection should attempt (default 5 times).
+  --timeout <sec>             Set the socket timeout (default 15 seconds).
+  --exists-action <action>    Default action when a path already exists: (s)witch, (i)gnore, (w)ipe, (b)ackup, (a)bort.
+  --trusted-host <hostname>   Mark this host or host:port pair as trusted, even though it does not have valid or any HTTPS.
+  --cert <path>               Path to PEM-encoded CA certificate bundle. If provided, overrides the default. See 'SSL Certificate Verification' in pip documentation for more information.
+  --client-cert <path>        Path to SSL client certificate, a single file containing the private key and the certificate in PEM format.
+  --cache-dir <dir>           Store the cache data in <dir>.
+  --no-cache-dir              Disable the cache.
+  --disable-pip-version-check
+                              Don't periodically check PyPI to determine whether a new version of pip is available for download. Implied with --no-index.
+  --no-color                  Suppress colored output.
+  --no-python-version-warning
+                              Silence deprecation warnings for upcoming unsupported Pythons.
+  --use-feature <feature>     Enable new functionality, that may be backward incompatible.
+  --use-deprecated <feature>  Enable deprecated functionality, that will be removed in the future.
+bash-5.2# 
+
+-------------------
+
+
+no copy code inside conatiner 
+
+bash-5.2# [root@ip-172-31-25-85 ~]# docker ps
+CONTAINER ID   IMAGE     COMMAND       CREATED              STATUS          PORTS     NAMES
+797d8d2bb3c8   im1       "/bin/bash"   About a minute ago   Up 59 seconds             beautiful_curie
+[root@ip-172-31-25-85 ~]# docker images
+REPOSITORY   TAG       IMAGE ID       CREATED              SIZE
+im1          latest    c6538cef971e   About a minute ago   298MB
+<none>       <none>    fefa4365d92d   6 days ago           150MB
+
+---------------------
+
+
+[root@ip-172-31-25-85 ~]# docker build -t img3 .
+[+] Building 2.9s (10/10) FINISHED                                                                                                                                                                  docker:default
+ => [internal] load build definition from Dockerfile                                                                                                                                                          0.0s
+ => => transferring dockerfile: 224B                                                                                                                                                                          0.0s
+ => [internal] load metadata for docker.io/library/amazonlinux:latest                                                                                                                                         0.1s
+ => [internal] load .dockerignore                                                                                                                                                                             0.0s
+ => => transferring context: 2B                                                                                                                                                                               0.0s
+ => [1/5] FROM docker.io/library/amazonlinux:latest@sha256:cfa6c2d0270c6517c0e46cb87aed7edcae8d9eb96af5f51814b6ee8680faaa2c                                                                                   0.0s
+ => [internal] load build context                                                                                                                                                                             0.0s
+ => => transferring context: 3.66kB                                                                                                                                                                           0.0s
+ => CACHED [2/5] RUN yum update -y && yum install python3-pip -y                                                                                                                                              0.0s
+ => CACHED [3/5] WORKDIR /app                                                                                                                                                                                 0.0s
+ => [4/5] COPY . /app                                                                                                                                                                                         0.0s
+ => [5/5] RUN pip3 install -r requirments.txt                                                                                                                                                                 2.6s
+ => exporting to image                                                                                                                                                                                        0.1s 
+ => => exporting layers                                                                                                                                                                                       0.1s 
+ => => writing image sha256:63035827d383166a0d774ccdaa38bd7c79ba56f48be3a451736d0d6119c34766                                                                                                                  0.0s 
+ => => naming to docker.io/library/img3                                                                                                                                                                       0.0s 
+[root@ip-172-31-25-85 ~]# cat Dockerfile                                                                                                                                                                           
+FROM amazonlinux                                                                                                                                                                                                   
+RUN yum update -y && yum install python3-pip -y
+WORKDIR /app
+COPY . /app
+RUN pip3 install -r requirments.txt
+
+[root@ip-172-31-25-85 ~]# ls -lrt
+total 12
+-rw-r--r--. 1 root root 127 Apr 22 03:01 Dockerfile
+-rw-r--r--. 1 root root 299 Apr 22 03:02 app.py
+-rw-r--r--. 1 root root   6 Apr 22 03:02 requirments.txt
+[root@ip-172-31-25-85 ~]# cat app.py
+from flask import Flask
+import os
+
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "updated Flask sample application on azure hghapp service updated verrsion-4"
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True,host='0.0.0.0',port=port)
+[root@ip-172-31-25-85 ~]# cat requirments.txt 
+flask
+[root@ip-172-31-25-85 ~]# 
+
+-------------------------
+
+SO in above conatiner not created only image created dont confuse guys 
+
+[root@ip-172-31-25-85 ~]# docker build -t img3 .
+[+] Building 3.1s (10/10) FINISHED                                                                                                                                                                  docker:default
+ => [internal] load build definition from Dockerfile                                                                                                                                                          0.0s
+ => => transferring dockerfile: 224B                                                                                                                                                                          0.0s
+ => [internal] load metadata for docker.io/library/amazonlinux:latest                                                                                                                                         0.1s
+ => [internal] load .dockerignore                                                                                                                                                                             0.0s
+ => => transferring context: 2B                                                                                                                                                                               0.0s
+ => [1/5] FROM docker.io/library/amazonlinux:latest@sha256:cfa6c2d0270c6517c0e46cb87aed7edcae8d9eb96af5f51814b6ee8680faaa2c                                                                                   0.0s
+ => [internal] load build context                                                                                                                                                                             0.0s
+ => => transferring context: 3.79kB                                                                                                                                                                           0.0s
+ => CACHED [2/5] RUN yum update -y && yum install python3-pip -y                                                                                                                                              0.0s
+ => CACHED [3/5] WORKDIR /app                                                                                                                                                                                 0.0s
+ => [4/5] COPY . /app                                                                                                                                                                                         0.0s
+ => [5/5] RUN pip3 install -r requirments.txt                                                                                                                                                                 2.7s
+ => exporting to image                                                                                                                                                                                        0.1s 
+ => => exporting layers                                                                                                                                                                                       0.1s 
+ => => writing image sha256:a422045da6d22578e16b1476aea6b19ff4f3a405d2dea6ff5970b3680b5fcbe6                                                                                                                  0.0s 
+ => => naming to docker.io/library/img3                                                                                                                                                                       0.0s 
+[root@ip-172-31-25-85 ~]# docker run -it img3 .                                                                                                                                                          
+docker: Error response from daemon: failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: exec: ".": executable file not found in $PATH: unknown.
+ERRO[0000] error waiting for container: context canceled 
+[root@ip-172-31-25-85 ~]# docker run -it -p 5000:5000 img3
+bash-5.2# ls -lrt
+total 12
+-rw-r--r--. 1 root root 127 Apr 22 03:01 Dockerfile
+-rw-r--r--. 1 root root 299 Apr 22 03:02 app.py
+-rw-r--r--. 1 root root   6 Apr 22 03:02 requirments.txt
+bash-5.2# 
+
+-----------------------------
+
+
+[root@ip-172-31-25-85 ~]# docker build -t img4 .
+[+] Building 36.7s (10/10) FINISHED                                                                                                                                                                 docker:default
+ => [internal] load build definition from Dockerfile                                                                                                                                                          0.0s
+ => => transferring dockerfile: 439B                                                                                                                                                                          0.0s
+ => [internal] load metadata for docker.io/library/ubuntu:22.04                                                                                                                                               0.2s
+ => [internal] load .dockerignore                                                                                                                                                                             0.0s
+ => => transferring context: 2B                                                                                                                                                                               0.0s
+ => CACHED [1/5] FROM docker.io/library/ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7                                                                                  0.0s
+ => [internal] load build context                                                                                                                                                                             0.0s
+ => => transferring context: 13.26kB                                                                                                                                                                          0.0s
+ => [2/5] RUN apt-get update &&     apt-get install -y python3-pip &&     apt-get clean                                                                                                                      31.2s
+ => [3/5] WORKDIR /app                                                                                                                                                                                        0.0s 
+ => [4/5] COPY . /app                                                                                                                                                                                         0.1s 
+ => [5/5] RUN pip3 install -r requirments.txt                                                                                                                                                                 2.2s 
+ => exporting to image                                                                                                                                                                                        3.0s 
+ => => exporting layers                                                                                                                                                                                       3.0s 
+ => => writing image sha256:391cfcea7f24a5419bab3c4d6dea618fd6f3e8bdf84d8310a69ab982f97cb21f                                                                                                                  0.0s 
+ => => naming to docker.io/library/img4                                                                                                                                                                       0.0s 
+[root@ip-172-31-25-85 ~]# cat Dockerfile 
+FROM ubuntu:22.04                                                                                                                                                                                                  
+
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python and pip
+RUN apt-get update && \
+    apt-get install -y python3-pip && \
+    apt-get clean
+
+# Set working directory
+WORKDIR /app
+
+# Copy files
+COPY . /app
+
+# Install dependencies
+RUN pip3 install -r requirments.txt
+CMD ["python3", "app.py"]
+[root@ip-172-31-25-85 ~]# 
+
+-----
+
+conatiner hewalth check depends on applciation runnign 
+
+[root@ip-172-31-25-85 ~]# docker run -dt img4
+fcb0c316d341a910bbe627060ec3f2269831a28fca0b169ed2212a03a6f1e70d
+[root@ip-172-31-25-85 ~]# docker ps
+CONTAINER ID   IMAGE     COMMAND            CREATED          STATUS          PORTS                                       NAMES
+fcb0c316d341   img4      "python3 app.py"   7 seconds ago    Up 5 seconds                                                charming_buck
+6c27759e8ed1   img3      "/bin/bash"        12 minutes ago   Up 12 minutes   0.0.0.0:5000->5000/tcp, :::5000->5000/tcp   unruffled_napier
+797d8d2bb3c8   im1       "/bin/bash"        26 minutes ago   Up 26 minutes                                               beautiful_curie
+[root@ip-172-31-25-85 ~]# 
+
+
+-------------------------------------
+
+[root@ip-172-31-25-85 ~]# docker run -dt img4 bab01227893bc17744035b6f36c371179abc6c86158acf45ab2579bde0088c92 [root@ip-172-31-25-85 ~]# dcoker ps -bash: dcoker: command not found [root@ip-172-31-25-85 ~]# docker ps CONTAINER ID IMAGE COMMAND CREATED STATUS PORTS NAMES bab01227893b img4 "python3 app.py" 5 seconds ago Up 4 seconds optimistic_kepler [root@ip-172-31-25-85 ~]# ss -tuln Netid State Recv-Q Send-Q Local Address:Port Peer Address:Port udp UNCONN 0 0 172.31.25.85%enX0:68 0.0.0.0:* udp UNCONN 0 0 127.0.0.1:323 0.0.0.0:* udp UNCONN 0 0 [::1]:323 [::]:* udp UNCONN 0 0 [fe80::8ff:d2ff:fe01:354f]%enX0:546 [::]:* tcp LISTEN 0 4096 127.0.0.1:41895 0.0.0.0:* tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:* tcp LISTEN 0 128 [::]:22 [::]:* [root@ip-172-31-25-85 ~]# docker run -dt -p 5001:5000 img4 39843a086e9fb85852c3748bcefcf10a4d17c0f559ece750f1e691d563b9e111 [root@ip-172-31-25-85 ~]# ss -tuln Netid State Recv-Q Send-Q Local Address:Port Peer Address:Port udp UNCONN 0 0 172.31.25.85%enX0:68 0.0.0.0:* udp UNCONN 0 0 127.0.0.1:323 0.0.0.0:* udp UNCONN 0 0 [::1]:323 [::]:* udp UNCONN 0 0 [fe80::8ff:d2ff:fe01:354f]%enX0:546 [::]:* tcp LISTEN 0 4096 127.0.0.1:41895 0.0.0.0:* tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:* tcp LISTEN 0 4096 0.0.0.0:5001 0.0.0.0:* tcp LISTEN 0 128 [::]:22 [::]:* tcp LISTEN 0 4096 [::]:5001 [::]:* why 5001 ports showing 2 times also i am not able to be access from browser http://54.227.143.27:5001/ and says site cant be reachec
+
+
+Finaly am able to sort by adding 5001 in security group 
+
+
+and able to access
+
+http://54.227.143.27:5001/
+
+updated Flask sample application on azure hghapp service updated verrsion-4
+
+
+
+
+
+
+
+
+
 
