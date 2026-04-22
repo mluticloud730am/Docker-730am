@@ -46,6 +46,80 @@ With Docker, you write all these steps **once** in a file called `Dockerfile`, b
 > - **Docker Image** = Packaged meal kit (artifact)
 > - **Container** = The actual meal on your plate (running instance)
 
+🧠 Big Picture (Flow)
+Code → Artifact → Dockerfile → Image → Container
+
+Each step transforms the previous one.
+
+🧱 1) Artifact (Generic concept)
+
+An artifact is any build output.
+
+Examples:
+Java → .jar, .war
+Python → .whl, app files
+Node → compiled bundle
+
+👉 It is language-specific and not runnable alone (needs runtime).
+
+📄 2) Dockerfile (Blueprint)
+
+A Dockerfile is a set of instructions to build an image.
+
+Example:
+FROM openjdk:17
+COPY app.jar app.jar
+CMD ["java", "-jar", "app.jar"]
+
+👉 It defines:
+
+Base environment
+Dependencies
+How to run the app
+
+👉 It is not executed directly — it’s used to build an image.
+
+📦 3) Image (Immutable package)
+
+A Docker Image is:
+
+Built from Dockerfile
+Read-only (immutable)
+Layered
+
+👉 Contains:
+
+Artifact (your app)
+Runtime (Java, Python, etc.)
+OS dependencies
+docker build -t myapp .
+🚀 4) Container (Running instance)
+
+A container is:
+
+A running instance of an image
+Has a writable layer on top
+docker run myapp
+
+👉 Multiple containers can run from same image.
+
+🐳 5) Docker (Platform)
+
+Docker is the tool/platform that manages everything:
+
+Builds images
+Runs containers
+Manages volumes, networks
+
+| Concept    | Type     | Role               | Mutable?          | Example          |
+| ---------- | -------- | ------------------ | ----------------- | ---------------- |
+| Artifact   | File     | App output         | ✅ Yes             | `app.jar`        |
+| Dockerfile | Script   | Build instructions | ✅ Yes             | `FROM ubuntu`    |
+| Image      | Package  | App + runtime      | ❌ No (immutable)  | `myapp:1.0`      |
+| Container  | Runtime  | Running app        | ✅ Yes (temporary) | Running instance |
+| Docker     | Platform | Tooling            | —                 | Docker Engine    |
+
+
 ---
 
 ## 2. EC2 vs Container — Layered Architecture
