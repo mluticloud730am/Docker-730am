@@ -1,0 +1,44 @@
+In Ec2 their will be Hardware,conatiners ,os ,docker that is actually made of examples 
+HW,OS,DOcker,Conatiners 
+
+in turn conatiner also will have simlar structure of HW and OS . From docker hub we will take base OS 
+
+example irctc is in python app so we will take ubuntu base os and then install python , and then copy code and then install dependencies and run application so these are all to be peformed in ec2 or conatiner and create a custom ami from this
+again if we create server with custom ami ideally irctc app.
+
+ideally the custom ami is an artifcat when we run image to server then only we can access here also by giving all instrcutions we can execute in container if conatiner is deleted then we may do all the steps 
+
+so by giving all instruction we will create one artifact so in aws point of  view it is articat in docker it is image 
+
+if image is ready conatiner will create and insider conatiner the IRCTC application wil be deployed 
+
+so ideally in ec2 ---> inside conatiner --> hw+os+python and then we see irctc app
+
+
+so ideally 4 layers unbuntu base image ,python,copy code,install dependecies ,
+
+run applciation finally 
+
+for above we will get one artifcat will be created once we run the artifact is ran then container created 
+
+so run application process will be created 
+so foreground process will run and python3 app.py will run on container 
+so base image is on /bin/bash so it should be override with os with python app 
+
+so in this case  we need to check about main python app.py process wshould run with active process and not for default process
+
+so theses instruction we need run and keep ready 
+
+
+custome ami created and ASG is their to take care and it will be done 
+
+
+
+now main concept is where we create these instrtuction so we create a file called docker fileto created with all instruction 
+
+
+so thsi is containerxzation platfomr so we need to give instryctoin in docker file when you build docker file 
+
+
+lets understand each instrcution which we given docker file 
+
