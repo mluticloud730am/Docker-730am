@@ -1020,3 +1020,53 @@ tcp                   LISTEN                 0                      511         
 tcp                   LISTEN                 0                      128                                                               [::]:22                                            [::]:*                    
 tcp                   LISTEN                 0                      4096                                                              [::]:32768                                         [::]:*                    
 
+----------------------------
+[root@ip-172-31-24-140 ec2-user]# docker run -dt -p 81:80 --network none nginx
+8cf4b87f9cdcc9d8c15a73db247c51f527a28a4cd2c99df34a1740f820c84a51
+[root@ip-172-31-24-140 ec2-user]# docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS          PORTS                                     NAMES
+8cf4b87f9cdc   nginx     "/docker-entrypoint.…"   4 seconds ago    Up 3 seconds                                              nostalgic_pike
+06da7e00c5c6   nginx     "/docker-entrypoint.…"   5 minutes ago    Up 5 minutes    0.0.0.0:32768->80/tcp, :::32768->80/tcp   busy_engelbart
+3173a121738d   nginx     "/docker-entrypoint.…"   10 minutes ago   Up 10 minutes                                             unruffled_mclean
+[root@ip-172-31-24-140 ec2-user]# docker inspect 8cf4b87f9cdc
+[
+    {
+        "Id": "8cf4b87f9cdcc9d8c15a73db247c51f527a28a4cd2c99df34a1740f820c84a51",
+        "Created": "2026-04-29T03:21:11.966916799Z",
+        "Path": "/docker-entrypoint.sh",
+        "Args": [
+            "nginx",
+            "-g",
+            "daemon off;"
+        ],
+        "State": {
+            "Status": "ru
+
+
+NONE Network 
+
+            "Networks": {
+                "none": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": null,
+                    "MacAddress": "",
+                    "NetworkID": "cc7ed4a97227f940cdb867c68158ea3a8d14f5d78950b6f9cadc025556bfbac7",
+                    "EndpointID": "34df9565fe71d35ff0006e8deb4d240aaec3c3095691139cb93d1c79f308cd9e",
+                    "Gateway": "",
+                    "IPAddress": "",
+                    "IPPrefixLen": 0,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DriverOpts": null,
+                    "DNSNames": null
+                }
+            }
+        }
+    }
+]
+[root@ip-172-31-24-140 ec2-user]# 
+
+completely isolated from network host,bridge  and no one can access the network so container can run alone 
+
