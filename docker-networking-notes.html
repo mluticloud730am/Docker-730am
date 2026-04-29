@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker Networking — Deep Dive Notes</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --accent4: #f59e0b;
+    --accent5: #ef4444;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+    --code-bg: #0d1117;
+    --bridge-color: #00d4ff;
+    --host-color: #10b981;
+    --none-color: #ef4444;
+    --custom-color: #a78bfa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Lora', Georgia, serif;
+    line-height: 1.8;
+    overflow-x: hidden;
+  }
+
+  /* HERO */
+  .hero {
+    background: linear-gradient(135deg, #0a0e1a 0%, #0f172a 40%, #1a0a2e 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 60px 40px 50px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -100px; right: -100px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: -80px; left: 20%;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(124,58,237,0.05) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 2px;
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero p {
+    font-size: 1.05rem;
+    color: var(--text-dim);
+    max-width: 600px;
+    font-style: italic;
+  }
+  .hero-meta {
+    display: flex;
+    gap: 24px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+  .hero-meta span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .hero-meta span b { color: var(--accent3); }
+
+  /* LAYOUT */
+  .container { max-width: 1000px; margin: 0 auto; padding: 0 32px; }
+
+  /* TOC */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 28px 32px;
+    margin: 40px 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .toc h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .toc ol { padding-left: 20px; }
+  .toc li { color: var(--text-dim); font-size: 0.95rem; margin: 6px 0; }
+  .toc li a { color: var(--text-dim); text-decoration: none; transition: color .2s; }
+  .toc li a:hover { color: var(--accent); }
+
+  /* SECTIONS */
+  .section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+  .section:last-child { border-bottom: none; }
+
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 20px;
+    line-height: 1.2;
+  }
+  h2 .num {
+    color: var(--accent);
+    margin-right: 8px;
+    font-size: 1.1rem;
+  }
+
+  h3 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: var(--text);
+    margin: 28px 0 12px;
+  }
+
+  p { color: var(--text-dim); margin-bottom: 14px; font-size: 0.98rem; }
+  p strong { color: var(--text); font-family: 'Lora', serif; }
+
+  /* CALLOUTS */
+  .callout {
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-left: 3px solid;
+    font-size: 0.93rem;
+  }
+  .callout-info { background: rgba(0,212,255,0.06); border-color: var(--accent); }
+  .callout-warn { background: rgba(245,158,11,0.06); border-color: var(--accent4); }
+  .callout-danger { background: rgba(239,68,68,0.06); border-color: var(--accent5); }
+  .callout-success { background: rgba(16,185,129,0.06); border-color: var(--accent3); }
+  .callout-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+  .callout-info .callout-label { color: var(--accent); }
+  .callout-warn .callout-label { color: var(--accent4); }
+  .callout-danger .callout-label { color: var(--accent5); }
+  .callout-success .callout-label { color: var(--accent3); }
+  .callout p { color: var(--text-dim); margin: 0; }
+
+  /* CODE */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 24px;
+    overflow-x: auto;
+    margin: 16px 0;
+    position: relative;
+  }
+  pre code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: #c9d1d9;
+    line-height: 1.7;
+  }
+  .code-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .cmd { color: #79c0ff; }
+  .out { color: #a5d6ff; }
+  .comment { color: #6e7681; font-style: italic; }
+  .ok { color: #3fb950; }
+  .err { color: #f85149; }
+  .ip { color: #ffa657; }
+  .kw { color: #ff7b72; }
+
+  /* NETWORK TYPE CARDS */
+  .net-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin: 28px 0; }
+  .net-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s, border-color .2s;
+  }
+  .net-card:hover { transform: translateY(-2px); }
+  .net-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .net-card.bridge::before { background: var(--bridge-color); }
+  .net-card.host::before { background: var(--host-color); }
+  .net-card.none::before { background: var(--none-color); }
+  .net-card.custom::before { background: var(--custom-color); }
+  .net-card:hover.bridge { border-color: var(--bridge-color); }
+  .net-card:hover.host { border-color: var(--host-color); }
+  .net-card:hover.none { border-color: var(--none-color); }
+  .net-card:hover.custom { border-color: var(--custom-color); }
+
+  .net-card-icon { font-size: 1.8rem; margin-bottom: 12px; }
+  .net-card h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .net-card.bridge h4 { color: var(--bridge-color); }
+  .net-card.host h4 { color: var(--host-color); }
+  .net-card.none h4 { color: var(--none-color); }
+  .net-card.custom h4 { color: var(--custom-color); }
+  .net-card p { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+
+  .net-card .tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    margin-top: 10px;
+    letter-spacing: 1px;
+  }
+  .net-card.bridge .tag { background: rgba(0,212,255,0.1); color: var(--bridge-color); }
+  .net-card.host .tag { background: rgba(16,185,129,0.1); color: var(--host-color); }
+  .net-card.none .tag { background: rgba(239,68,68,0.1); color: var(--none-color); }
+  .net-card.custom .tag { background: rgba(167,139,250,0.1); color: var(--custom-color); }
+
+  /* DIAGRAM WRAPPER */
+  .diagram-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 28px;
+    margin: 24px 0;
+    overflow-x: auto;
+  }
+  .diagram-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  /* COMPARISON TABLE */
+  .compare-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+  .compare-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: var(--code-bg);
+  }
+  .compare-table td {
+    padding: 12px 16px;
+    font-size: 0.88rem;
+    border-bottom: 1px solid rgba(30,45,69,0.5);
+    color: var(--text-dim);
+    vertical-align: top;
+  }
+  .compare-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .compare-table .good { color: var(--accent3); }
+  .compare-table .bad { color: var(--accent5); }
+  .compare-table .warn { color: var(--accent4); }
+
+  /* FLOW DIAGRAM */
+  .flow { margin: 24px 0; }
+
+  /* REAL WORLD SCENARIOS */
+  .scenario {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .scenario-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .scenario-num {
+    width: 28px; height: 28px;
+    background: var(--accent2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .scenario h4 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text);
+  }
+  .scenario p { font-size: 0.88rem; margin-bottom: 8px; }
+
+  /* CHEAT SHEET */
+  .cheat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
+  .cheat-item {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+  .cheat-item .cheat-cmd {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .cheat-item .cheat-desc { font-size: 0.8rem; color: var(--text-muted); }
+
+  /* FOOTER */
+  footer {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 32px 40px;
+    text-align: center;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+
+  @media (max-width: 600px) {
+    .hero { padding: 40px 20px; }
+    .container { padding: 0 20px; }
+    .cheat-grid { grid-template-columns: 1fr; }
+    .net-cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="container">
+    <div class="hero-badge">DevOps Learning Series</div>
+    <h1>Docker <span>Networking</span><br>Deep Dive</h1>
+    <p>Bridge, Host, None, Custom Networks — concepts, internals, real-world flows, and traps to avoid.</p>
+    <div class="hero-meta">
+      <span>📅 <b>April 29, 2026</b></span>
+      <span>🖥 <b>EC2 t2.medium</b> — Amazon Linux 2023</span>
+      <span>🐋 <b>Docker Engine</b> — Hands-on Lab</span>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- TOC -->
+  <div class="toc">
+    <h3>📋 Contents</h3>
+    <ol>
+      <li><a href="#why">Why Docker Networking Exists</a></li>
+      <li><a href="#types">The Three Network Types</a></li>
+      <li><a href="#bridge">Bridge Network — Default & Deep Dive</a></li>
+      <li><a href="#host">Host Network — Direct Access</a></li>
+      <li><a href="#none">None Network — Full Isolation</a></li>
+      <li><a href="#custom">Custom Networks</a></li>
+      <li><a href="#traffic">End-to-End Traffic Flow</a></li>
+      <li><a href="#comparison">Comparison Table</a></li>
+      <li><a href="#realworld">Real-World Scenarios</a></li>
+      <li><a href="#cheatsheet">Command Cheat Sheet</a></li>
+    </ol>
+  </div>
+
+  <!-- SECTION 1: WHY -->
+  <div class="section" id="why">
+    <span class="section-label">Foundation</span>
+    <h2><span class="num">01</span>Why Docker Networking Exists</h2>
+
+    <p>Containers are <strong>isolated processes</strong>. By default, they have no way to talk to the outside world or to each other. Docker Networking is the subsystem that gives containers <strong>internal and external connectivity</strong> in a controlled, configurable way.</p>
+
+    <p>Think of it exactly like a VPC on AWS — just as EC2 instances inside a VPC communicate over private IPs, containers inside a Docker network communicate over Docker-assigned private IPs.</p>
+
+    <div class="callout callout-info">
+      <div class="callout-label">💡 Role Clarity in DevOps</div>
+      <p>Your job as a DevOps engineer is to <strong>write Dockerfiles and build images</strong>. Running and orchestrating containers at scale is Kubernetes' job. Docker networking concepts become the foundation for understanding Kubernetes pod networking, CNI plugins, and services — so learning this well pays off later.</p>
+    </div>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">🐳 Docker's Place in the Ecosystem</div>
+      <svg viewBox="0 0 860 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:860px;display:block;margin:auto;">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#475569"/>
+          </marker>
+        </defs>
+        <!-- Step boxes -->
+        <rect x="10" y="50" width="160" height="60" rx="6" fill="#111827" stroke="#1e2d45" stroke-width="1.5"/>
+        <text x="90" y="77" text-anchor="middle" fill="#00d4ff" font-family="JetBrains Mono,monospace" font-size="12" font-weight="700">Dockerfile</text>
+        <text x="90" y="97" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="10">You write this</text>
+
+        <line x1="172" y1="80" x2="218" y2="80" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <rect x="220" y="50" width="160" height="60" rx="6" fill="#111827" stroke="#1e2d45" stroke-width="1.5"/>
+        <text x="300" y="77" text-anchor="middle" fill="#00d4ff" font-family="JetBrains Mono,monospace" font-size="12" font-weight="700">Docker Image</text>
+        <text x="300" y="97" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="10">docker build</text>
+
+        <line x1="382" y1="80" x2="428" y2="80" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <rect x="430" y="50" width="160" height="60" rx="6" fill="#111827" stroke="#1e2d45" stroke-width="1.5"/>
+        <text x="510" y="77" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono,monospace" font-size="12" font-weight="700">Container</text>
+        <text x="510" y="97" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="10">docker run</text>
+
+        <line x1="592" y1="80" x2="638" y2="80" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <rect x="640" y="50" width="200" height="60" rx="6" fill="#0d1117" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="740" y="77" text-anchor="middle" fill="#7c3aed" font-family="JetBrains Mono,monospace" font-size="12" font-weight="700">Kubernetes</text>
+        <text x="740" y="97" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="10">Orchestrates at scale</text>
+
+        <!-- Labels -->
+        <text x="90" y="135" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono,monospace" font-size="10">✓ Your Responsibility</text>
+        <text x="510" y="135" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono,monospace" font-size="10">✓ Your Responsibility</text>
+        <text x="740" y="135" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono,monospace" font-size="10">K8s takes over here</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- SECTION 2: TYPES -->
+  <div class="section" id="types">
+    <span class="section-label">Core Concepts</span>
+    <h2><span class="num">02</span>The Three Network Types</h2>
+
+    <p>Docker ships with three built-in network drivers. Every container must be on exactly one of these (or a custom variant of bridge):</p>
+
+    <div class="net-cards">
+      <div class="net-card bridge">
+        <div class="net-card-icon">🌉</div>
+        <h4>BRIDGE</h4>
+        <p>The default. Creates a private internal network on the host. Containers get their own IPs and talk through a gateway. Port mapping required for external access.</p>
+        <span class="tag">DEFAULT</span>
+      </div>
+      <div class="net-card host">
+        <div class="net-card-icon">🖥</div>
+        <h4>HOST</h4>
+        <p>Container shares the EC2's network stack directly. No isolation, no port mapping, no overhead. Container uses host ports directly. Risk: port conflicts.</p>
+        <span class="tag">HIGH PERFORMANCE</span>
+      </div>
+      <div class="net-card none">
+        <div class="net-card-icon">🔒</div>
+        <h4>NONE</h4>
+        <p>Container has NO network interface. Completely isolated — cannot reach the internet, other containers, or the host. Maximum isolation.</p>
+        <span class="tag">FULLY ISOLATED</span>
+      </div>
+    </div>
+
+    <div class="callout callout-info">
+      <div class="callout-label">📌 Quick Check — from docker network ls</div>
+      <p>Run <code style="font-family:JetBrains Mono,monospace;color:var(--accent)">docker network ls</code> and you will always see these three pre-created: <b>bridge</b> (driver: bridge), <b>host</b> (driver: host), <b>none</b> (driver: null). Any networks you create yourself will also appear here.</p>
+    </div>
+
+    <span class="code-label">$ docker network ls</span>
+    <pre><code><span class="kw">NETWORK ID     NAME      DRIVER    SCOPE</span>
+<span class="ip">67897621fc91</span>   bridge    bridge    local    <span class="comment">← default, created automatically</span>
+<span class="ip">da042981f850</span>   host      host      local    <span class="comment">← shares EC2 network stack</span>
+<span class="ip">cc7ed4a97227</span>   none      null      local    <span class="comment">← no network at all</span>
+<span class="ip">f3631353aeff</span>   dev       bridge    local    <span class="comment">← user-created custom bridge</span></code></pre>
+  </div>
+
+  <!-- SECTION 3: BRIDGE -->
+  <div class="section" id="bridge">
+    <span class="section-label">Network Type 1</span>
+    <h2><span class="num">03</span>Bridge Network — The Default</h2>
+
+    <p>When you run <code style="font-family:JetBrains Mono,monospace;color:var(--accent)">docker run nginx</code> without specifying a network, Docker attaches the container to the <strong>default bridge network</strong>. This creates a virtual switch inside your EC2 host.</p>
+
+    <h3>How Bridge Networking Works Internally</h3>
+    <p>Docker creates a virtual network interface called <strong>docker0</strong> on the host. This acts as the <strong>gateway</strong> (172.17.0.1). Every container that joins the bridge gets an IP from the <strong>172.17.0.0/16</strong> subnet — each container gets a unique IP in this range.</p>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">🌉 Bridge Network Architecture — Your Actual Lab</div>
+      <svg viewBox="0 0 820 480" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:820px;display:block;margin:auto;">
+        <defs>
+          <marker id="arr2" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#00d4ff" opacity="0.7"/>
+          </marker>
+          <marker id="arr3" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#475569"/>
+          </marker>
+        </defs>
+
+        <!-- EC2 Host Box -->
+        <rect x="20" y="20" width="780" height="440" rx="10" fill="none" stroke="#1e2d45" stroke-width="2" stroke-dasharray="8,4"/>
+        <text x="40" y="48" fill="#475569" font-family="JetBrains Mono,monospace" font-size="11" letter-spacing="2">EC2 INSTANCE — 172.31.24.140</text>
+
+        <!-- Internet -->
+        <rect x="320" y="8" width="180" height="30" rx="4" fill="#0a0e1a" stroke="#475569" stroke-width="1"/>
+        <text x="410" y="28" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="11">🌐 INTERNET / USER</text>
+
+        <!-- Arrow Internet → EC2 -->
+        <line x1="410" y1="38" x2="410" y2="70" stroke="#475569" stroke-width="1.5" marker-end="url(#arr3)"/>
+        <text x="415" y="58" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">Internet Gateway</text>
+
+        <!-- EC2 NIC -->
+        <rect x="310" y="72" width="200" height="40" rx="5" fill="#1a2235" stroke="#475569" stroke-width="1.5"/>
+        <text x="410" y="89" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="11" font-weight="700">EC2 Network (enX0)</text>
+        <text x="410" y="104" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="10">172.31.24.140  Port :80, :81</text>
+
+        <!-- Arrow EC2 → Gateway -->
+        <line x1="410" y1="114" x2="410" y2="154" stroke="#00d4ff" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr2)"/>
+
+        <!-- Bridge Gateway docker0 -->
+        <rect x="260" y="156" width="300" height="50" rx="6" fill="#0d2235" stroke="#00d4ff" stroke-width="2"/>
+        <text x="410" y="177" text-anchor="middle" fill="#00d4ff" font-family="JetBrains Mono,monospace" font-size="12" font-weight="700">docker0 — Bridge Gateway</text>
+        <text x="410" y="196" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="10">172.17.0.1  (Network: 172.17.0.0/16)</text>
+
+        <!-- Bridge box (internal network) -->
+        <rect x="60" y="240" width="700" height="200" rx="8" fill="#0a1520" stroke="#1e3a50" stroke-width="1.5"/>
+        <text x="80" y="264" fill="#1e3a50" font-family="JetBrains Mono,monospace" font-size="11" letter-spacing="2">BRIDGE NETWORK — 172.17.0.0/16 (NetworkID: 67897621fc91)</text>
+
+        <!-- Container 1: nginx (priceless_almeida) -->
+        <rect x="80" y="276" width="180" height="140" rx="6" fill="#111827" stroke="#1e2d45" stroke-width="1.5"/>
+        <rect x="80" y="276" width="180" height="6" rx="3" fill="#00d4ff"/>
+        <text x="170" y="303" text-anchor="middle" fill="#00d4ff" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">nginx</text>
+        <text x="170" y="320" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">priceless_almeida</text>
+        <text x="170" y="336" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="11" font-weight="700">172.17.0.2</text>
+        <text x="170" y="352" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">port 80 (NOT exposed)</text>
+        <text x="170" y="368" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">ContainerID: 6e0b0ca0</text>
+        <rect x="100" y="378" width="140" height="22" rx="3" fill="#0a2a0a" stroke="#1e3a1e"/>
+        <text x="170" y="393" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono,monospace" font-size="9">internal only</text>
+
+        <!-- Container 2: nginx (upbeat_wu) -->
+        <rect x="295" y="276" width="180" height="140" rx="6" fill="#111827" stroke="#1e2d45" stroke-width="1.5"/>
+        <rect x="295" y="276" width="180" height="6" rx="3" fill="#00d4ff"/>
+        <text x="385" y="303" text-anchor="middle" fill="#00d4ff" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">nginx</text>
+        <text x="385" y="320" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">upbeat_wu</text>
+        <text x="385" y="336" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="11" font-weight="700">172.17.0.3</text>
+        <text x="385" y="352" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">port 81:80 (exposed)</text>
+        <text x="385" y="368" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">ContainerID: 9d377c81</text>
+        <rect x="313" y="378" width="140" height="22" rx="3" fill="#1a1a00" stroke="#3a3a00"/>
+        <text x="385" y="393" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="9">EC2:81 → container:80</text>
+
+        <!-- Container 3: httpd (apache-server) -->
+        <rect x="510" y="276" width="180" height="140" rx="6" fill="#111827" stroke="#1e2d45" stroke-width="1.5"/>
+        <rect x="510" y="276" width="180" height="6" rx="3" fill="#10b981"/>
+        <text x="600" y="303" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">httpd (Apache)</text>
+        <text x="600" y="320" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">apache-server</text>
+        <text x="600" y="336" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="11" font-weight="700">172.17.0.4</text>
+        <text x="600" y="352" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">port 80:80 (exposed)</text>
+        <text x="600" y="368" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">ContainerID: c35864518</text>
+        <rect x="528" y="378" width="140" height="22" rx="3" fill="#1a1a00" stroke="#3a3a00"/>
+        <text x="600" y="393" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="9">EC2:80 → container:80</text>
+
+        <!-- Lines: containers → gateway -->
+        <line x1="170" y1="276" x2="290" y2="210" stroke="#1e3a50" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <line x1="385" y1="276" x2="410" y2="210" stroke="#1e3a50" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <line x1="600" y1="276" x2="530" y2="210" stroke="#1e3a50" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+        <!-- Ping arrow (container ping) -->
+        <path d="M 260 346 Q 220 310 260 276" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="3,3" fill="none" marker-end="url(#arr2)"/>
+        <text x="205" y="316" fill="#a78bfa" font-family="JetBrains Mono,monospace" font-size="8">ping works ✓</text>
+      </svg>
+    </div>
+
+    <h3>Key Properties of Bridge Network</h3>
+    <p>From your lab, the <code style="font-family:JetBrains Mono,monospace;color:var(--accent)">docker inspect</code> output confirmed exactly this architecture:</p>
+
+    <ul style="list-style:none;padding:0;margin:16px 0;">
+      <li style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:12px;color:var(--text-dim);font-size:0.9rem;"><span style="color:var(--accent);font-family:'JetBrains Mono',monospace;min-width:120px">Gateway</span>172.17.0.1 — this is the docker0 virtual interface on the EC2 host</li>
+      <li style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:12px;color:var(--text-dim);font-size:0.9rem;"><span style="color:var(--accent);font-family:'JetBrains Mono',monospace;min-width:120px">nginx #1</span>172.17.0.2 (no port mapping — internal only)</li>
+      <li style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:12px;color:var(--text-dim);font-size:0.9rem;"><span style="color:var(--accent);font-family:'JetBrains Mono',monospace;min-width:120px">nginx #2</span>172.17.0.3 (mapped EC2:81 → container:80)</li>
+      <li style="padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:12px;color:var(--text-dim);font-size:0.9rem;"><span style="color:var(--accent);font-family:'JetBrains Mono',monospace;min-width:120px">httpd</span>172.17.0.4 (mapped EC2:80 → container:80)</li>
+      <li style="padding:8px 0;color:var(--text-dim);font-size:0.9rem;"><span style="color:var(--accent);font-family:'JetBrains Mono',monospace;min-width:120px">Subnet</span>172.17.0.0/16 — can hold up to 65,534 containers</li>
+    </ul>
+
+    <h3>Container-to-Container Communication (Ping Test)</h3>
+    <p>Your lab proved that all containers on the <strong>same bridge network</strong> can ping each other using their private IPs — without any port mapping. The Ubuntu container (172.17.0.5) successfully pinged the httpd container (172.17.0.4) with zero packet loss.</p>
+
+    <span class="code-label">Inside Ubuntu container on bridge network:</span>
+    <pre><code><span class="comment"># After apt install iputils-ping</span>
+<span class="cmd">root@0b0dc0f88f30:/# ping 172.17.0.4</span>
+<span class="ok">PING 172.17.0.4 (172.17.0.4) 56(84) bytes of data.</span>
+<span class="ok">64 bytes from 172.17.0.4: icmp_seq=1 ttl=127 time=0.095 ms</span>
+<span class="ok">64 bytes from 172.17.0.4: icmp_seq=2 ttl=127 time=0.065 ms</span>
+<span class="ok">64 bytes from 172.17.0.4: icmp_seq=3 ttl=127 time=0.066 ms</span>
+<span class="comment">--- 3 packets transmitted, 3 received, 0% packet loss ---</span>
+<span class="comment">✓ Bridge allows free inter-container communication!</span></code></pre>
+
+    <div class="callout callout-warn">
+      <div class="callout-label">⚠️ Default Bridge Limitation</div>
+      <p>The <strong>default bridge network</strong> does NOT support DNS-based container discovery. You can only ping by IP. To ping by container name (e.g., <code style="font-family:JetBrains Mono,monospace">ping apache-server</code>), you need a <strong>custom bridge network</strong> — which Docker creates when you run <code style="font-family:JetBrains Mono,monospace">docker network create</code>. Custom bridges have built-in DNS resolution.</p>
+    </div>
+
+    <h3>Port Mapping — -p vs -P</h3>
+    <span class="code-label">Lowercase -p: you choose the port mapping</span>
+    <pre><code><span class="cmd">docker run -dt -p 81:80 nginx</span>
+<span class="comment"># EC2 port 81 → container port 80 (you control which EC2 port)</span>
+<span class="comment"># Access via: http://&lt;ec2-ip&gt;:81</span></code></pre>
+
+    <span class="code-label">Uppercase -P: Docker chooses a random high port</span>
+    <pre><code><span class="cmd">docker run -dt -P nginx</span>
+<span class="out">PORTS: 0.0.0.0:32768->80/tcp</span>
+<span class="comment"># Docker randomly assigned port 32768 on EC2 → container port 80</span>
+<span class="comment"># Useful in dev/testing when you don't care which port is used</span></code></pre>
+  </div>
+
+  <!-- SECTION 4: HOST -->
+  <div class="section" id="host">
+    <span class="section-label">Network Type 2</span>
+    <h2><span class="num">04</span>Host Network — Sharing EC2's Network Stack</h2>
+
+    <p>With <code style="font-family:JetBrains Mono,monospace;color:var(--accent3)">--network host</code>, the container does NOT get its own network namespace. It <strong>directly uses the EC2 instance's network interfaces, IPs, and ports</strong>. There is no docker0 gateway, no NAT, no port mapping.</p>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">🖥 Host Network — Container Shares EC2 Network Stack</div>
+      <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:820px;display:block;margin:auto;">
+        <defs>
+          <marker id="arr4" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#10b981"/>
+          </marker>
+          <marker id="arr5" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#ef4444"/>
+          </marker>
+        </defs>
+
+        <!-- Internet -->
+        <rect x="320" y="10" width="180" height="30" rx="4" fill="#0a0e1a" stroke="#475569" stroke-width="1"/>
+        <text x="410" y="30" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="11">🌐 User / Internet</text>
+
+        <!-- Arrow -->
+        <line x1="410" y1="42" x2="410" y2="70" stroke="#475569" stroke-width="1.5" marker-end="url(#arr4)"/>
+
+        <!-- EC2 Host box -->
+        <rect x="20" y="72" width="780" height="270" rx="10" fill="none" stroke="#1e3a2e" stroke-width="2"/>
+        <text x="40" y="96" fill="#2a5a3e" font-family="JetBrains Mono,monospace" font-size="11" letter-spacing="2">EC2 INSTANCE — 172.31.24.140 (enX0)</text>
+
+        <!-- EC2 Network Stack - shared -->
+        <rect x="210" y="108" width="400" height="60" rx="6" fill="#0d2e1e" stroke="#10b981" stroke-width="2"/>
+        <text x="410" y="133" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="12" font-weight="700">Shared Network Stack</text>
+        <text x="410" y="153" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="10">IP: 172.31.24.140 | Ports available: all of EC2's ports</text>
+
+        <!-- SCENARIO A: Success -->
+        <rect x="50" y="200" width="320" height="120" rx="6" fill="#0a1a0a" stroke="#1e3a1e" stroke-width="1.5"/>
+        <text x="210" y="222" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">✅ SCENARIO A — Works</text>
+
+        <rect x="70" y="232" width="280" height="70" rx="5" fill="#111827" stroke="#1e2d45"/>
+        <rect x="70" y="232" width="280" height="5" rx="2" fill="#10b981"/>
+        <text x="210" y="254" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="11">nginx container</text>
+        <text x="210" y="270" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">--network host → uses EC2 port 80</text>
+        <text x="210" y="285" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">No other service on port 80</text>
+        <text x="210" y="300" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono,monospace" font-size="9">→ nginx starts, accessible at EC2:80</text>
+        <text x="210" y="310" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="8">IP: "" (no container IP!), Gateway: ""</text>
+
+        <!-- SCENARIO B: Conflict -->
+        <rect x="450" y="200" width="320" height="120" rx="6" fill="#1a0a0a" stroke="#3a1e1e" stroke-width="1.5"/>
+        <text x="610" y="222" text-anchor="middle" fill="#f85149" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">❌ SCENARIO B — Port Conflict</text>
+
+        <rect x="470" y="232" width="280" height="70" rx="5" fill="#111827" stroke="#1e2d45"/>
+        <rect x="470" y="232" width="280" height="5" rx="2" fill="#ef4444"/>
+        <text x="610" y="254" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="11">nginx container</text>
+        <text x="610" y="270" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">--network host → tries EC2 port 80</text>
+        <text x="610" y="285" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">But: yum-installed nginx already on 80!</text>
+        <text x="610" y="300" text-anchor="middle" fill="#f85149" font-family="JetBrains Mono,monospace" font-size="9">FATAL: bind() failed: Address already in use</text>
+        <text x="610" y="310" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="8">Shown in: docker logs &lt;id&gt;</text>
+
+        <!-- Connection lines -->
+        <line x1="410" y1="168" x2="210" y2="200" stroke="#10b981" stroke-width="1.2" stroke-dasharray="4,3"/>
+        <line x1="410" y1="168" x2="610" y2="200" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4,3"/>
+
+        <!-- Key insight -->
+        <text x="410" y="340" text-anchor="middle" fill="#475569" font-family="JetBrains Mono,monospace" font-size="10">-p flags are IGNORED with host network (Docker warns you)</text>
+      </svg>
+    </div>
+
+    <span class="code-label">Your exact lab output proving the conflict:</span>
+    <pre><code><span class="comment"># yum-installed nginx already holding port 80</span>
+<span class="cmd">docker run -dt --network host --name rakesh nginx</span>
+<span class="cmd">docker logs 3f21e55c3ab8</span>
+
+<span class="err">[emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)</span>
+<span class="err">nginx: [emerg] bind() to [::]:80 failed (98: Address already in use)</span>
+<span class="err">nginx: [emerg] still could not bind()</span>
+
+<span class="comment"># After yum remove nginx → no more conflict → works!</span>
+<span class="cmd">docker run -dt --network host nginx</span>
+<span class="ok">[notice] 1#1: nginx/1.29.8</span>
+<span class="ok">[notice] 1#1: start worker processes  ← SUCCESS</span>
+
+<span class="comment"># -p flag is silently IGNORED with host network:</span>
+<span class="cmd">docker run -dt -p 81:80 --network host nginx</span>
+<span class="out">WARNING: Published ports are discarded when using host network mode</span></code></pre>
+
+    <div class="callout callout-danger">
+      <div class="callout-label">🚨 Host Network Pitfalls</div>
+      <p><strong>Port conflicts</strong> — if EC2 runs any service on the same port, the container will fail to start. Always check with <code style="font-family:JetBrains Mono,monospace">ss -tuln</code> before running host-network containers. <strong>No isolation</strong> — any port the container opens is immediately exposed on the EC2 IP. And <strong>no multiple replicas</strong> — you cannot run two host-network containers that both want port 80.</p>
+    </div>
+
+    <div class="callout callout-success">
+      <div class="callout-label">✅ When to Use Host Network</div>
+      <p>Host networking gives <strong>maximum throughput with zero NAT overhead</strong>. Use it for high-performance scenarios like network monitoring tools, packet sniffers, or when the container needs to listen on many dynamic ports. Best practice: <strong>dedicate the EC2 to Docker containers only</strong> — don't install application services (nginx, mysql) directly on the EC2 OS.</p>
+    </div>
+  </div>
+
+  <!-- SECTION 5: NONE -->
+  <div class="section" id="none">
+    <span class="section-label">Network Type 3</span>
+    <h2><span class="num">05</span>None Network — Complete Isolation</h2>
+
+    <p>With <code style="font-family:JetBrains Mono,monospace;color:var(--accent5)">--network none</code>, the container gets its own isolated network namespace but <strong>no network interfaces are created inside it</strong> except the loopback (lo). No gateway. No IP. Cannot reach anything.</p>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">🔒 None Network — Fully Isolated Container</div>
+      <svg viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:820px;display:block;margin:auto;">
+        <!-- EC2 Host -->
+        <rect x="20" y="20" width="780" height="260" rx="10" fill="none" stroke="#1e2d45" stroke-width="2" stroke-dasharray="8,4"/>
+        <text x="40" y="46" fill="#475569" font-family="JetBrains Mono,monospace" font-size="11" letter-spacing="2">EC2 INSTANCE</text>
+
+        <!-- Bridge Network (other containers) -->
+        <rect x="50" y="60" width="300" height="180" rx="6" fill="#0a1520" stroke="#1e3a50" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="200" y="84" text-anchor="middle" fill="#1e3a50" font-family="JetBrains Mono,monospace" font-size="10">Bridge network containers</text>
+        <rect x="70" y="96" width="120" height="60" rx="4" fill="#111827" stroke="#1e2d45"/>
+        <text x="130" y="117" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">nginx</text>
+        <text x="130" y="133" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="9">172.17.0.2</text>
+        <rect x="210" y="96" width="120" height="60" rx="4" fill="#111827" stroke="#1e2d45"/>
+        <text x="270" y="117" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="9">httpd</text>
+        <text x="270" y="133" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="9">172.17.0.4</text>
+        <!-- Cross arrows from none to bridge -->
+        <line x1="420" y1="178" x2="360" y2="136" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="390" y="145" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="8" transform="rotate(-28,390,145)">✗ blocked</text>
+
+        <!-- None Network Container -->
+        <rect x="440" y="60" width="320" height="180" rx="6" fill="#1a0a0a" stroke="#ef4444" stroke-width="2"/>
+        <text x="600" y="84" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="10" letter-spacing="1">NONE NETWORK</text>
+
+        <rect x="480" y="98" width="240" height="120" rx="6" fill="#111827" stroke="#2d1a1a"/>
+        <rect x="480" y="98" width="240" height="5" rx="2" fill="#ef4444"/>
+        <text x="600" y="122" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="11" font-weight="700">nginx container</text>
+        <text x="600" y="142" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">IP Address: ""  (none)</text>
+        <text x="600" y="158" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">Gateway: ""  (none)</text>
+        <text x="600" y="174" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">Network Driver: null</text>
+        <text x="600" y="190" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="9">Only interface: lo (loopback)</text>
+        <text x="600" y="206" text-anchor="middle" fill="#475569" font-family="JetBrains Mono,monospace" font-size="9">Can ping: 127.0.0.1 only</text>
+
+        <!-- Cross to internet -->
+        <line x1="600" y1="60" x2="600" y2="40" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="615" y="35" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="9">✗ No internet</text>
+      </svg>
+    </div>
+
+    <span class="code-label">docker inspect proves no IP, no gateway:</span>
+    <pre><code><span class="cmd">docker run -dt -p 81:80 --network none nginx</span>
+<span class="comment"># Inspect NetworkSettings:</span>
+"Networks": {
+    "none": {
+        "Gateway": <span class="err">""</span>,        <span class="comment">← no gateway</span>
+        "IPAddress": <span class="err">""</span>,     <span class="comment">← no IP assigned</span>
+        "MacAddress": <span class="err">""</span>,    <span class="comment">← no MAC address</span>
+        "NetworkID": "cc7ed4a97227..."
+    }
+}</code></pre>
+
+    <div class="callout callout-info">
+      <div class="callout-label">💡 When is "none" useful?</div>
+      <p><strong>Security-sensitive processing jobs</strong> — for example, a container that processes sensitive documents (PII data, cryptographic operations) where you want guaranteed network isolation. Also useful for <strong>batch jobs</strong> that read from mounted volumes and write output locally with no need for any network.</p>
+    </div>
+  </div>
+
+  <!-- SECTION 6: CUSTOM NETWORK -->
+  <div class="section" id="custom">
+    <span class="section-label">Network Type 4</span>
+    <h2><span class="num">06</span>Custom Bridge Networks</h2>
+
+    <p>You can create your own bridge networks with <code style="font-family:JetBrains Mono,monospace;color:var(--custom-color)">docker network create &lt;name&gt;</code>. The benefit over the default bridge: <strong>automatic DNS resolution by container name</strong> and <strong>network isolation between groups of containers</strong>.</p>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">🔀 Custom Networks — Isolation Between Teams / Environments</div>
+      <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:820px;display:block;margin:auto;">
+        <defs>
+          <marker id="arr6" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#a78bfa"/>
+          </marker>
+          <marker id="arr7" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#ef4444" opacity="0.7"/>
+          </marker>
+        </defs>
+        <!-- EC2 wrapper -->
+        <rect x="10" y="10" width="800" height="360" rx="10" fill="none" stroke="#1e2d45" stroke-width="1.5" stroke-dasharray="6,4"/>
+        <text x="30" y="34" fill="#475569" font-family="JetBrains Mono,monospace" font-size="10">EC2 HOST</text>
+
+        <!-- Default Bridge -->
+        <rect x="30" y="48" width="360" height="150" rx="6" fill="#0a1520" stroke="#00d4ff" stroke-width="1.5"/>
+        <text x="210" y="70" text-anchor="middle" fill="#00d4ff" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">bridge (default) — 172.17.0.0/16</text>
+        <text x="210" y="84" text-anchor="middle" fill="#475569" font-family="JetBrains Mono,monospace" font-size="9">Gateway: 172.17.0.1  |  NetworkID: 6789...</text>
+        <rect x="50" y="96" width="120" height="88" rx="5" fill="#111827" stroke="#1e2d45"/>
+        <text x="110" y="118" text-anchor="middle" fill="#00d4ff" font-family="JetBrains Mono,monospace" font-size="9" font-weight="700">nginx</text>
+        <text x="110" y="133" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="9">172.17.0.2</text>
+        <text x="110" y="148" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">priceless_almeida</text>
+        <rect x="250" y="96" width="120" height="88" rx="5" fill="#111827" stroke="#1e2d45"/>
+        <text x="310" y="118" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="9" font-weight="700">httpd</text>
+        <text x="310" y="133" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="9">172.17.0.4</text>
+        <text x="310" y="148" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">apache-server</text>
+        <!-- ping arrow inside default -->
+        <path d="M 172 140 Q 200 120 248 140" stroke="#a78bfa" fill="none" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="210" y="175" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono,monospace" font-size="8">✓ can ping each other</text>
+
+        <!-- Custom Bridge "dev" -->
+        <rect x="430" y="48" width="360" height="150" rx="6" fill="#1a0a2e" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="610" y="70" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">dev (custom) — 172.18.0.0/16</text>
+        <text x="610" y="84" text-anchor="middle" fill="#475569" font-family="JetBrains Mono,monospace" font-size="9">Gateway: 172.18.0.1  |  NetworkID: f363...</text>
+        <rect x="450" y="96" width="140" height="88" rx="5" fill="#111827" stroke="#1e2d45"/>
+        <text x="520" y="118" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono,monospace" font-size="9" font-weight="700">ubuntu</text>
+        <text x="520" y="133" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="9">172.18.0.2</text>
+        <text x="520" y="148" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">zen_shtern</text>
+        <text x="520" y="163" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono,monospace" font-size="8">--network dev</text>
+        <rect x="610" y="96" width="140" height="88" rx="5" fill="#111827" stroke="#1e2d45"/>
+        <text x="680" y="118" text-anchor="middle" fill="#a78bfa" font-family="JetBrains Mono,monospace" font-size="9" font-weight="700">app-container</text>
+        <text x="680" y="133" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="9">172.18.0.3</text>
+        <text x="680" y="148" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">custom-net member</text>
+        <text x="680" y="163" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono,monospace" font-size="8">--network dev</text>
+
+        <!-- Cross-network blocked arrow -->
+        <line x1="392" y1="126" x2="428" y2="126" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arr7)"/>
+        <text x="410" y="118" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="8">✗</text>
+        <text x="410" y="144" text-anchor="middle" fill="#ef4444" font-family="JetBrains Mono,monospace" font-size="8">blocked</text>
+
+        <!-- Advantages box -->
+        <rect x="30" y="218" width="760" height="130" rx="6" fill="#0d1117" stroke="#1e2d45" stroke-width="1"/>
+        <text x="410" y="240" text-anchor="middle" fill="#3fb950" font-family="JetBrains Mono,monospace" font-size="11" font-weight="700">✅ Custom Bridge Advantages Over Default Bridge</text>
+        <text x="60" y="266" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="10">🔍 DNS resolution: ping by name →  ping apache-server  works (not just by IP)</text>
+        <text x="60" y="286" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="10">🔒 Isolation: dev network containers CANNOT reach bridge network containers</text>
+        <text x="60" y="306" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="10">🏗  Environment separation: use "dev", "staging", "prod" networks on one host</text>
+        <text x="60" y="326" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="10">🔗 docker-compose creates a custom bridge per project automatically</text>
+      </svg>
+    </div>
+
+    <span class="code-label">Creating and using a custom network:</span>
+    <pre><code><span class="comment"># Create custom network named "dev"</span>
+<span class="cmd">docker network create dev</span>
+<span class="out">f3631353aeff2f77a0c6fc099567ab2ba9922a7e792ceafbb88a45381fd656bd</span>
+
+<span class="comment"># Run a container in the custom network</span>
+<span class="cmd">docker run -it --network dev ubuntu</span>
+
+<span class="comment"># This container gets 172.18.0.2 — a DIFFERENT subnet from bridge (172.17.x.x)</span>
+<span class="comment"># Ping from dev network to bridge network FAILS — correct! Networks are isolated.</span>
+<span class="cmd">root@2156cea3c683:/# ping 172.17.0.4</span>
+<span class="comment"># No response → cross-network isolation working as designed</span></code></pre>
+  </div>
+
+  <!-- SECTION 7: TRAFFIC FLOW -->
+  <div class="section" id="traffic">
+    <span class="section-label">End-to-End</span>
+    <h2><span class="num">07</span>Complete Traffic Flow — User to Application</h2>
+
+    <p>Here's the exact path a request takes to reach your containerized application in a bridge network setup:</p>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">🔄 Full Request Flow — User → Internet → EC2 → Container</div>
+      <svg viewBox="0 0 820 120" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:820px;display:block;margin:auto;">
+        <defs>
+          <marker id="arr8" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#00d4ff"/>
+          </marker>
+        </defs>
+        <rect x="10" y="30" width="100" height="50" rx="5" fill="#111827" stroke="#1e2d45"/>
+        <text x="60" y="53" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">USER</text>
+        <text x="60" y="68" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">Browser</text>
+
+        <line x1="112" y1="55" x2="148" y2="55" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arr8)"/>
+        <text x="130" y="48" text-anchor="middle" fill="#475569" font-family="JetBrains Mono,monospace" font-size="7">HTTP</text>
+
+        <rect x="150" y="30" width="110" height="50" rx="5" fill="#111827" stroke="#1e2d45"/>
+        <text x="205" y="53" text-anchor="middle" fill="#94a3b8" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">IGW</text>
+        <text x="205" y="68" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">Internet GW</text>
+
+        <line x1="262" y1="55" x2="298" y2="55" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arr8)"/>
+
+        <rect x="300" y="20" width="130" height="70" rx="5" fill="#0d2235" stroke="#00d4ff"/>
+        <text x="365" y="48" text-anchor="middle" fill="#00d4ff" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">EC2</text>
+        <text x="365" y="63" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">172.31.24.140</text>
+        <text x="365" y="77" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="8">port :81</text>
+
+        <line x1="432" y1="55" x2="468" y2="55" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arr8)"/>
+        <text x="450" y="48" text-anchor="middle" fill="#475569" font-family="JetBrains Mono,monospace" font-size="7">NAT/iptables</text>
+
+        <rect x="470" y="20" width="130" height="70" rx="5" fill="#0a1520" stroke="#1e3a50"/>
+        <text x="535" y="48" text-anchor="middle" fill="#00d4ff" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">docker0</text>
+        <text x="535" y="63" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">172.17.0.1</text>
+        <text x="535" y="77" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">Gateway</text>
+
+        <line x1="602" y1="55" x2="638" y2="55" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arr8)"/>
+        <text x="620" y="48" text-anchor="middle" fill="#475569" font-family="JetBrains Mono,monospace" font-size="7">routes to</text>
+
+        <rect x="640" y="20" width="160" height="70" rx="5" fill="#0d1117" stroke="#1e2d45"/>
+        <text x="720" y="45" text-anchor="middle" fill="#10b981" font-family="JetBrains Mono,monospace" font-size="10" font-weight="700">nginx container</text>
+        <text x="720" y="60" text-anchor="middle" fill="#ffa657" font-family="JetBrains Mono,monospace" font-size="8">172.17.0.3</text>
+        <text x="720" y="75" text-anchor="middle" fill="#64748b" font-family="JetBrains Mono,monospace" font-size="8">port :80 (internal)</text>
+      </svg>
+    </div>
+
+    <p>The flow as your trainer described it:</p>
+    <pre><code><span class="comment">User → IGW → EC2:81 → docker0 gateway (172.17.0.1) → container:80 → response</span>
+
+<span class="comment">EC2 Security Group: Must allow port 81 inbound</span>
+<span class="comment">Docker port mapping: -p 81:80 (EC2 port 81 → container port 80)</span>
+<span class="comment">iptables rules: Docker manages these automatically</span></code></pre>
+  </div>
+
+  <!-- SECTION 8: COMPARISON -->
+  <div class="section" id="comparison">
+    <span class="section-label">Summary</span>
+    <h2><span class="num">08</span>Comparison Table</h2>
+
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Bridge (default)</th>
+          <th>Host</th>
+          <th>None</th>
+          <th>Custom Bridge</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Container gets own IP</td>
+          <td class="good">✓ Yes (172.17.x.x)</td>
+          <td class="bad">✗ No (shares host)</td>
+          <td class="bad">✗ No IP at all</td>
+          <td class="good">✓ Yes (172.18.x.x)</td>
+        </tr>
+        <tr>
+          <td>Inter-container communication</td>
+          <td class="good">✓ Via IP</td>
+          <td class="good">✓ Via IP</td>
+          <td class="bad">✗ None</td>
+          <td class="good">✓ Via IP or name</td>
+        </tr>
+        <tr>
+          <td>DNS by container name</td>
+          <td class="bad">✗ No</td>
+          <td class="warn">n/a</td>
+          <td class="bad">✗ No</td>
+          <td class="good">✓ Yes (automatic)</td>
+        </tr>
+        <tr>
+          <td>External access</td>
+          <td class="warn">Port mapping required (-p)</td>
+          <td class="good">Direct (same as EC2)</td>
+          <td class="bad">✗ Impossible</td>
+          <td class="warn">Port mapping required</td>
+        </tr>
+        <tr>
+          <td>Port conflicts</td>
+          <td class="good">No (NAT'd)</td>
+          <td class="bad">Yes, shares EC2 ports</td>
+          <td class="good">None (no network)</td>
+          <td class="good">No (NAT'd)</td>
+        </tr>
+        <tr>
+          <td>Isolation</td>
+          <td class="warn">Partial</td>
+          <td class="bad">None</td>
+          <td class="good">Maximum</td>
+          <td class="good">Network-level isolation</td>
+        </tr>
+        <tr>
+          <td>Performance</td>
+          <td class="warn">Slight NAT overhead</td>
+          <td class="good">Maximum (no NAT)</td>
+          <td class="good">N/A</td>
+          <td class="warn">Slight NAT overhead</td>
+        </tr>
+        <tr>
+          <td>Multiple replicas</td>
+          <td class="good">✓ Yes (diff ports)</td>
+          <td class="bad">✗ Port conflicts</td>
+          <td class="warn">✓ (but useless)</td>
+          <td class="good">✓ Yes</td>
+        </tr>
+        <tr>
+          <td>Use in docker-compose</td>
+          <td class="good">✓ Default</td>
+          <td class="warn">Special cases only</td>
+          <td class="warn">Rare</td>
+          <td class="good">✓ Preferred</td>
+        </tr>
+        <tr>
+          <td>Kubernetes equivalent</td>
+          <td>CNI plugin default</td>
+          <td>hostNetwork: true</td>
+          <td>—</td>
+          <td>NetworkPolicy</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SECTION 9: REAL WORLD -->
+  <div class="section" id="realworld">
+    <span class="section-label">Industry Practice</span>
+    <h2><span class="num">09</span>Real-World Scenarios</h2>
+
+    <div class="scenario">
+      <div class="scenario-header">
+        <div class="scenario-num">1</div>
+        <h4>Microservices App — Frontend + Backend + DB</h4>
+      </div>
+      <p>A typical 3-tier app has a React frontend, Node.js API, and MongoDB. All three run as containers. You create one <strong>custom bridge network</strong> ("app-net"). All containers join it. The API talks to MongoDB by name (<code style="font-family:JetBrains Mono,monospace;color:var(--accent)">mongodb:27017</code>) using Docker DNS. Only the frontend is port-mapped to EC2 for external access.</p>
+      <pre><code><span class="cmd">docker network create app-net</span>
+<span class="cmd">docker run -d --network app-net --name mongodb mongo</span>
+<span class="cmd">docker run -d --network app-net --name api -e MONGO_URL=mongodb://mongodb:27017/db my-api</span>
+<span class="cmd">docker run -d --network app-net -p 80:3000 my-frontend</span>
+<span class="comment"># API resolves "mongodb" by name → Docker DNS → 172.18.0.2</span></code></pre>
+    </div>
+
+    <div class="scenario">
+      <div class="scenario-header">
+        <div class="scenario-num">2</div>
+        <h4>CI/CD Pipeline — Isolated Build Environments</h4>
+      </div>
+      <p>In a Jenkins pipeline, each build job runs in a <strong>none</strong> or <strong>custom bridge</strong> network container to prevent builds from interfering with each other. Security-critical builds (processing secrets) use <strong>--network none</strong> to ensure no exfiltration is possible.</p>
+      <pre><code><span class="comment"># Secure build: no network access — reads from volume, writes to volume</span>
+<span class="cmd">docker run --network none -v /build:/workspace my-build-image</span>
+<span class="comment"># Test environment: isolated bridge so tests don't hit prod</span>
+<span class="cmd">docker run --network test-net my-test-runner</span></code></pre>
+    </div>
+
+    <div class="scenario">
+      <div class="scenario-header">
+        <div class="scenario-num">3</div>
+        <h4>High-Performance Proxy/Load Balancer — Host Network</h4>
+      </div>
+      <p>When running nginx as a <strong>reverse proxy/load balancer</strong> in front of many services, host networking eliminates NAT latency. The EC2 must be dedicated to this proxy container only. No other services should run on port 80/443.</p>
+      <pre><code><span class="comment"># EC2 is dedicated — no system nginx, no other apps on 80/443</span>
+<span class="cmd">docker run -d --network host --restart always nginx-proxy</span>
+<span class="comment"># Result: same throughput as bare-metal nginx, zero NAT overhead</span></code></pre>
+    </div>
+
+    <div class="scenario">
+      <div class="scenario-header">
+        <div class="scenario-num">4</div>
+        <h4>Dev/Staging/Prod on One EC2 (Cost Saving)</h4>
+      </div>
+      <p>Three separate custom networks isolate environments. Containers in "dev-net" cannot accidentally reach containers in "prod-net". Each network gets its own IP range via Docker's IPAM.</p>
+      <pre><code><span class="cmd">docker network create dev-net</span>
+<span class="cmd">docker network create staging-net</span>
+<span class="cmd">docker network create prod-net</span>
+<span class="cmd">docker run --network dev-net my-app:dev</span>     <span class="comment"># 172.18.x.x</span>
+<span class="cmd">docker run --network staging-net my-app:staging</span><span class="comment"># 172.19.x.x</span>
+<span class="cmd">docker run --network prod-net my-app:prod</span>    <span class="comment"># 172.20.x.x</span></code></pre>
+    </div>
+
+    <div class="callout callout-warn">
+      <div class="callout-label">🎯 Real-World Truth from Your Trainer</div>
+      <p>In real production, you rarely manage Docker networks and volumes manually — <strong>Kubernetes handles all of this</strong>. Docker's role ends at building the image and pushing it to a registry. K8s takes the image and handles networking, scaling, and storage. However, understanding Docker networking deeply is essential because <strong>Kubernetes networking (pods, services, CNI) follows the same fundamental concepts</strong>.</p>
+    </div>
+  </div>
+
+  <!-- SECTION 10: CHEATSHEET -->
+  <div class="section" id="cheatsheet">
+    <span class="section-label">Quick Reference</span>
+    <h2><span class="num">10</span>Command Cheat Sheet</h2>
+
+    <div class="cheat-grid">
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker network ls</span>
+        <span class="cheat-desc">List all networks (bridge, host, none, custom)</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker network create &lt;name&gt;</span>
+        <span class="cheat-desc">Create a custom bridge network</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker run --network bridge nginx</span>
+        <span class="cheat-desc">Explicit bridge (same as default)</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker run --network host nginx</span>
+        <span class="cheat-desc">Use EC2's network stack directly</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker run --network none nginx</span>
+        <span class="cheat-desc">Fully isolated — no network access</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker run --network dev nginx</span>
+        <span class="cheat-desc">Join a custom user-created network</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker run -p 81:80 nginx</span>
+        <span class="cheat-desc">Map EC2:81 → container:80 (your choice)</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker run -P nginx</span>
+        <span class="cheat-desc">Map random high port → container exposed ports</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker inspect &lt;id&gt;</span>
+        <span class="cheat-desc">Show IP, Gateway, NetworkSettings of container</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker network inspect &lt;name&gt;</span>
+        <span class="cheat-desc">Show all containers on a network with IPs</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker network connect &lt;net&gt; &lt;ctr&gt;</span>
+        <span class="cheat-desc">Add running container to an additional network</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker network rm &lt;name&gt;</span>
+        <span class="cheat-desc">Delete a custom network (containers must be removed)</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">docker system prune</span>
+        <span class="cheat-desc">Remove stopped containers, unused networks, dangling images</span>
+      </div>
+      <div class="cheat-item">
+        <span class="cheat-cmd">ss -tuln</span>
+        <span class="cheat-desc">Check which ports are in use on EC2 (avoid conflicts)</span>
+      </div>
+    </div>
+
+    <div class="callout callout-success">
+      <div class="callout-label">🧠 Mental Model to Remember</div>
+      <p>Think of Docker networking like a <strong>building with floors</strong>: <b>Bridge</b> = separate apartments with a shared lobby (gateway) — you need a room number (port mapping) to be reachable from outside. <b>Host</b> = open office with no walls — everything is visible to everyone, but you can't have two people on the same phone extension. <b>None</b> = soundproof vault — completely isolated, nothing goes in or out. <b>Custom bridge</b> = a private floor only your team has access to, with intercom (DNS) by name.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <div>Docker Networking Deep Dive — Class Notes · April 29, 2026</div>
+  <div style="margin-top:8px;color:#334155">Bridge · Host · None · Custom — EC2 t2.medium Lab · Amazon Linux 2023</div>
+</footer>
+
+</body>
+</html>
