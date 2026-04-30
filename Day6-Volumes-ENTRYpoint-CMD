@@ -1,0 +1,413 @@
+BY default docker containers are not persistent data will be deleted along with container
+
+to make it persistent we use docker volumnes
+docker volumnes can use host path to store data external even conatiner delete volume remains persistent even we can use addtional storage options also
+ebs efs 
+by default volumnes will be stored in /var/lib/docker/volumnes
+docker volume create vol1
+
+
+Complete!
+[root@ip-172-31-16-139 ec2-user]# systemctl start docker
+[root@ip-172-31-16-139 ec2-user]# systemctl enable docker
+Created symlink /etc/systemd/system/multi-user.target.wants/docker.service → /usr/lib/systemd/system/docker.service.
+[root@ip-172-31-16-139 ec2-user]# docker volume create vol1
+vol1
+
+[root@ip-172-31-16-139 ec2-user]# docker run -it --name=con1 -v vol1:/vol1 ubuntu
+Unable to find image 'ubuntu:latest' locally
+latest: Pulling from library/ubuntu
+b40150c1c271: Pull complete 
+Digest: sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
+Status: Downloaded newer image for ubuntu:latest
+root@b40b73d2a37d:/# 
+
+root@b40b73d2a37d:/# cd vol1/
+root@b40b73d2a37d:/vol1# pwd
+/vol1
+root@b40b73d2a37d:/vol1# ls
+root@b40b73d2a37d:/vol1# touch file1
+root@b40b73d2a37d:/vol1# ls
+file1
+root@b40b73d2a37d:/vol1# pwd
+/vol1
+root@b40b73d2a37d:/vol1# 
+
+
+
+[root@ip-172-31-16-139 volumes]# ls -lrt
+total 24
+brw-------. 1 root root 202, 1 Apr 30 02:24 backingFsBlockDev
+drwx-----x. 3 root root     19 Apr 30 02:24 vol1
+-rw-------. 1 root root  32768 Apr 30 02:24 metadata.db
+[root@ip-172-31-16-139 volumes]# pwd
+/var/lib/docker/volumes
+
+
+root@ip-172-31-16-139 volumes]# cd vol1/
+[root@ip-172-31-16-139 vol1]# ls
+_data
+[root@ip-172-31-16-139 vol1]# cd _data/
+[root@ip-172-31-16-139 _data]# ls -lrt
+total 0
+-rw-r--r--. 1 root root 0 Apr 30 02:26 file1
+
+----------------------
+
+
+[root@ip-172-31-16-139 _data]# docker run -it --name=con2 -v vol1:/vol1 ubuntu
+root@0cdb024e8e76:/# touch file2
+root@0cdb024e8e76:/# ls -lrt
+total 0
+lrwxrwxrwx.   1 root root   8 Apr 22  2024 sbin -> usr/sbin
+lrwxrwxrwx.   1 root root   9 Apr 22  2024 lib64 -> usr/lib64
+lrwxrwxrwx.   1 root root   7 Apr 22  2024 lib -> usr/lib
+drwxr-xr-x.   2 root root   6 Apr 22  2024 boot
+lrwxrwxrwx.   1 root root   7 Apr 22  2024 bin -> usr/bin
+drwxr-xr-x.  12 root root 133 Apr 10 02:20 usr
+drwxr-xr-x.   2 root root   6 Apr 10 02:20 srv
+drwxr-xr-x.   2 root root   6 Apr 10 02:20 opt
+drwxr-xr-x.   2 root root   6 Apr 10 02:20 mnt
+drwxr-xr-x.   2 root root   6 Apr 10 02:20 media
+drwxr-xr-x.  11 root root 139 Apr 10 02:29 var
+drwx------.   2 root root  37 Apr 10 02:29 root
+drwxrwxrwt.   2 root root   6 Apr 10 02:29 tmp
+drwxr-xr-x.   4 root root  33 Apr 10 02:29 run
+drwxr-xr-x.   3 root root  20 Apr 10 02:29 home
+dr-xr-xr-x.  13 root root   0 Apr 30 02:18 sys
+drwxr-xr-x.   2 root root  19 Apr 30 02:26 vol1
+drwxr-xr-x.   1 root root  66 Apr 30 02:28 etc
+dr-xr-xr-x. 178 root root   0 Apr 30 02:28 proc
+drwxr-xr-x.   5 root root 360 Apr 30 02:28 dev
+-rw-r--r--.   1 root root   0 Apr 30 02:28 file2
+root@0cdb024e8e76:/# cd vol1
+root@0cdb024e8e76:/vol1# ls -lrt
+total 0
+-rw-r--r--. 1 root root 0 Apr 30 02:26 file1
+root@0cdb024e8e76:/vol1# touch file2
+root@0cdb024e8e76:/vol1# pwd 
+/vol1
+root@0cdb024e8e76:/vol1# ls -lrt
+total 0
+-rw-r--r--. 1 root root 0 Apr 30 02:26 file1
+-rw-r--r--. 1 root root 0 Apr 30 02:29 file2
+root@0cdb024e8e76:/vol1# 
+
+[root@ip-172-31-16-139 _data]# docker run -it --name=con3 -v vol3:/vol1 ubuntu
+root@dfe39b303ccb:/# ls
+bin  boot  dev  etc  home  lib  lib64  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var  vol1
+root@dfe39b303ccb:/# exit
+exit
+[root@ip-172-31-16-139 _data]# docker volume ls
+DRIVER    VOLUME NAME
+local     vol1
+local     vol3
+
+-------------------------
+
+root@2959248d1368:/# cd volz  
+root@2959248d1368:/volz# ls
+file1  file2
+root@2959248d1368:/volz# exit
+exit
+[root@ip-172-31-16-139 _data]# docker volumes ls
+docker: 'volumes' is not a docker command.
+See 'docker --help'
+[root@ip-172-31-16-139 _data]# docker volume ls
+DRIVER    VOLUME NAME
+local     vol1
+local     vol3
+[root@ip-172-31-16-139 _data]# pwd
+/var/lib/docker/volumes/vol1/_data
+[root@ip-172-31-16-139 _data]# ls 
+file1  file2
+[root@ip-172-31-16-139 _data]# docker run -it --name=con6 -v vol4:/volz ubuntu
+root@cdd3a62a27ac:/# ls
+bin  boot  dev  etc  home  lib  lib64  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var  volz
+root@cdd3a62a27ac:/# cd volz
+root@cdd3a62a27ac:/volz# touch file5
+root@cdd3a62a27ac:/volz# exit
+exit
+[root@ip-172-31-16-139 _data]# docker volume ls
+DRIVER    VOLUME NAME
+local     vol1
+local     vol3
+local     vol4
+[root@ip-172-31-16-139 _data]# pwd
+/var/lib/docker/volumes/vol1/_data
+[root@ip-172-31-16-139 _data]# ls
+file1  file2
+[root@ip-172-31-16-139 _data]# pwd
+/var/lib/docker/volumes/vol1/_data
+[root@ip-172-31-16-139 _data]# cd ../
+[root@ip-172-31-16-139 vol1]# cd .../
+bash: cd: .../: No such file or directory
+[root@ip-172-31-16-139 vol1]# cd../
+bash: cd../: No such file or directory
+[root@ip-172-31-16-139 vol1]# ls
+_data
+[root@ip-172-31-16-139 vol1]# cd ../
+[root@ip-172-31-16-139 volumes]# ls
+backingFsBlockDev  metadata.db  vol1  vol3  vol4
+[root@ip-172-31-16-139 volumes]# cd vol4
+[root@ip-172-31-16-139 vol4]# ls
+_data
+[root@ip-172-31-16-139 vol4]# cd _data/
+[root@ip-172-31-16-139 _data]# ls
+file5
+[root@ip-172-31-16-139 _data]# 
+
+
+Need to check on docker swarm also in depth - orchestration tool for docker also it is depreicated everywhere they are using kubernets and openshift only
+
+cloud manager kubernetes 
+
+90 % kubernetes if you learn then you can work any cloud managed kubernetes easily i mean aws axzure and gcp
+
+
+container volumne will be mount on host volume 
+
+
+
+Docker file 
+
+
+
+[root@ip-172-31-16-139 docker_python_flask-project]# cat app.py
+from flask import Flask
+import os
+
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "updated Flask sample application on azure hghapp service updated verrsion-4"
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True,host='0.0.0.0',port=port)
+[root@ip-172-31-16-139 docker_python_flask-project]# vi app1.py
+[root@ip-172-31-16-139 docker_python_flask-project]# docker build -t img1 .
+[+] Building 28.9s (9/9) FINISHED                                                                                                      docker:default
+ => [internal] load build definition from Dockerfile                                                                                             0.0s
+ => => transferring dockerfile: 296B                                                                                                             0.0s
+ => [internal] load metadata for docker.io/library/python:3.6                                                                                    0.3s
+ => [internal] load .dockerignore                                                                                                                0.0s
+ => => transferring context: 2B                                                                                                                  0.0s
+ => [internal] load build context                                                                                                                0.0s
+ => => transferring context: 114.55kB                                                                                                            0.0s
+ => [1/4] FROM docker.io/library/python:3.6@sha256:f8652afaf88c25f0d22354d547d892591067aa4026a7fa9a6819df9f300af6fc                             21.3s
+ => => resolve docker.io/library/python:3.6@sha256:f8652afaf88c25f0d22354d547d892591067aa4026a7fa9a6819df9f300af6fc                              0.0s
+ => => sha256:f8652afaf88c25f0d22354d547d892591067aa4026a7fa9a6819df9f300af6fc 1.86kB / 1.86kB                                                   0.0s
+ => => sha256:d097a4907a8ec079df5ac31872359c2de510f82214c0448e926393b376d3b60d 2.22kB / 2.22kB                                                   0.0s
+ => => sha256:54260638d07c5e3ad24c6e21fc889abbc8486a27634c0892086ff71f3f44b104 9.27kB / 9.27kB                                                   0.0s
+ => => sha256:0e29546d541cdbd309281d21a73a9d1db78665c1b95b74f32b009e0b77a6e1e3 54.92MB / 54.92MB                                                 0.7s
+ => => sha256:9b829c73b52b92b97d5c07a54fb0f3e921995a296c714b53a32ae67d19231fcd 5.15MB / 5.15MB                                                   0.2s
+ => => sha256:cb5b7ae361722f070eca53f35823ed21baa85d61d5d95cd5a95ab53d740cdd56 10.87MB / 10.87MB                                                 0.3s
+ => => sha256:6494e4811622b31c027ccac322ca463937fd805f569a93e6f15c01aade718793 54.57MB / 54.57MB                                                 1.7s
+ => => sha256:6f9f74896dfa93fe0172f594faba85e0b4e8a0481a0fefd9112efc7e4d3c78f7 196.51MB / 196.51MB                                               5.0s
+ => => extracting sha256:0e29546d541cdbd309281d21a73a9d1db78665c1b95b74f32b009e0b77a6e1e3                                                        3.5s
+ => => sha256:5e3b1213efc56598e78bd602983945c164de2a37205e06a62dada823124dc743 6.29MB / 6.29MB                                                   0.9s
+ => => sha256:9fddfdc56334f2e6efad7e241bf5e7459c40ed105c5478676f41c1244bd96752 14.21MB / 14.21MB                                                 1.3s
+ => => sha256:c4f42be2be53b900ebffc040c1df13de538434ccc5f5d954a56848a6169a3a3f 2.21MB / 2.21MB                                                   1.5s
+ => => sha256:404f02044bac0432ca522cbb9f254b1c91fcea6806bfeef0be0b243b2f31bab7 235B / 235B                                                       1.4s
+ => => extracting sha256:9b829c73b52b92b97d5c07a54fb0f3e921995a296c714b53a32ae67d19231fcd                                                        0.3s
+ => => extracting sha256:cb5b7ae361722f070eca53f35823ed21baa85d61d5d95cd5a95ab53d740cdd56                                                        0.3s
+ => => extracting sha256:6494e4811622b31c027ccac322ca463937fd805f569a93e6f15c01aade718793                                                        3.0s
+ => => extracting sha256:6f9f74896dfa93fe0172f594faba85e0b4e8a0481a0fefd9112efc7e4d3c78f7                                                        8.2s
+ => => extracting sha256:5e3b1213efc56598e78bd602983945c164de2a37205e06a62dada823124dc743                                                        0.4s
+ => => extracting sha256:9fddfdc56334f2e6efad7e241bf5e7459c40ed105c5478676f41c1244bd96752                                                        0.8s
+ => => extracting sha256:404f02044bac0432ca522cbb9f254b1c91fcea6806bfeef0be0b243b2f31bab7                                                        0.0s
+ => => extracting sha256:c4f42be2be53b900ebffc040c1df13de538434ccc5f5d954a56848a6169a3a3f                                                        0.5s
+ => [2/4] COPY . /app                                                                                                                            2.5s
+ => [3/4] WORKDIR /app                                                                                                                           0.0s
+ => [4/4] RUN pip install -r requirements.txt                                                                                                    4.4s
+ => exporting to image                                                                                                                           0.2s
+ => => exporting layers                                                                                                                          0.2s
+ => => writing image sha256:ba04f5c5b247d78eb77769d027ba92c439f6344187f8c4f177b1a088a283ab69                                                     0.0s
+ => => naming to docker.io/library/img1                                                                                                          0.0s
+[root@ip-172-31-16-139 docker_python_flask-project]# vi app1.py
+[root@ip-172-31-16-139 docker_python_flask-project]# vi Dockerfile 
+[root@ip-172-31-16-139 docker_python_flask-project]# docker build -t img3 .
+[+] Building 4.7s (9/9) FINISHED                                                                                                       docker:default
+ => [internal] load build definition from Dockerfile                                                                                             0.0s
+ => => transferring dockerfile: 295B                                                                                                             0.0s
+ => [internal] load metadata for docker.io/library/python:3.6                                                                                    0.1s
+ => [internal] load .dockerignore                                                                                                                0.0s
+ => => transferring context: 2B                                                                                                                  0.0s
+ => [internal] load build context                                                                                                                0.0s
+ => => transferring context: 6.32kB                                                                                                              0.0s
+ => CACHED [1/4] FROM docker.io/library/python:3.6@sha256:f8652afaf88c25f0d22354d547d892591067aa4026a7fa9a6819df9f300af6fc                       0.0s
+ => [2/4] COPY . /app                                                                                                                            0.0s
+ => [3/4] WORKDIR /app                                                                                                                           0.0s
+ => [4/4] RUN pip install -r requirements.txt                                                                                                    4.2s
+ => exporting to image                                                                                                                           0.2s 
+ => => exporting layers                                                                                                                          0.2s 
+ => => writing image sha256:54e682e8d410c1a4af85610ff6b7c2de8c3615d11d1099b184922927671c8d1a                                                     0.0s 
+ => => naming to docker.io/library/img3                                                                                                          0.0s 
+[root@ip-172-31-16-139 docker_python_flask-project]# docker images                                                                                    
+REPOSITORY   TAG       IMAGE ID       CREATED              SIZE                                                                                       
+img3         latest    54e682e8d410   7 seconds ago        913MB
+img1         latest    ba04f5c5b247   About a minute ago   913MB
+ubuntu       latest    0b1ebe5dd426   2 weeks ago          78.1MB
+[root@ip-172-31-16-139 docker_python_flask-project]# docker run -it img3 /bin/bash
+  File "/bin/bash", line 1
+SyntaxError: Non-UTF-8 code starting with '\x82' in file /bin/bash on line 2, but no encoding declared; see http://python.org/dev/peps/pep-0263/ for details
+[root@ip-172-31-16-139 docker_python_flask-project]# docker run -dt img3
+5feaf68f0644050204503e5eda8f725861ca5a51b6ff12833e2505dc3182fcb3
+[root@ip-172-31-16-139 docker_python_flask-project]# docker ps
+CONTAINER ID   IMAGE     COMMAND           CREATED          STATUS          PORTS      NAMES
+5feaf68f0644   img3      "python app.py"   3 seconds ago    Up 2 seconds    5000/tcp   wizardly_cori
+0cdb024e8e76   ubuntu    "/bin/bash"       54 minutes ago   Up 54 minutes              con2
+[root@ip-172-31-16-139 docker_python_flask-project]# docker exec -it 5feaf68f0644 /bin/bash
+root@5feaf68f0644:/app# ps aux
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.2  0.7  36632 29232 pts/0    Ss+  03:22   0:00 python app.py
+root          10  0.6  0.7 112052 29580 pts/0    Sl+  03:22   0:00 /usr/local/bin/python /app/app.py
+root          15  0.0  0.0   5992  3688 pts/1    Ss   03:23   0:00 /bin/bash
+root          21  0.0  0.0   8592  3352 pts/1    R+   03:25   0:00 ps aux
+root@5feaf68f0644:/app# ls
+Dockerfile  README.md  app.py  app1.py  deploy+process_ec2_process  nginx-process  requirements.txt
+root@5feaf68f0644:/app# exit
+exit
+[root@ip-172-31-16-139 docker_python_flask-project]# docker run -dt img3 app1.py
+cf159abd349a2baeac07a7ead319a6efb3f2ca0bce5c0af57518255853275b28
+[root@ip-172-31-16-139 docker_python_flask-project]# docker ps
+CONTAINER ID   IMAGE     COMMAND            CREATED          STATUS          PORTS      NAMES
+cf159abd349a   img3      "python app1.py"   5 seconds ago    Up 3 seconds    5000/tcp   unruffled_kare
+5feaf68f0644   img3      "python app.py"    3 minutes ago    Up 3 minutes    5000/tcp   wizardly_cori
+0cdb024e8e76   ubuntu    "/bin/bash"        57 minutes ago   Up 57 minutes              con2
+[root@ip-172-31-16-139 docker_python_flask-project]# docker ps
+CONTAINER ID   IMAGE     COMMAND            CREATED          STATUS          PORTS      NAMES
+cf159abd349a   img3      "python app1.py"   28 seconds ago   Up 27 seconds   5000/tcp   unruffled_kare
+5feaf68f0644   img3      "python app.py"    3 minutes ago    Up 3 minutes    5000/tcp   wizardly_cori
+0cdb024e8e76   ubuntu    "/bin/bash"        57 minutes ago   Up 57 minutes              con2
+[root@ip-172-31-16-139 docker_python_flask-project]# cat app.py
+from flask import Flask
+import os
+
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "updated Flask sample application on azure hghapp service updated verrsion-4"
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True,host='0.0.0.0',port=port)
+[root@ip-172-31-16-139 docker_python_flask-project]# cat app1.py
+from flask import Flask
+import os
+
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "app1.py updated Flask sample application on azure hghapp service updated verrsion-4"
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True,host='0.0.0.0',port=port)
+[root@ip-172-31-16-139 docker_python_flask-project]# docker ps
+CONTAINER ID   IMAGE     COMMAND            CREATED              STATUS              PORTS      NAMES
+cf159abd349a   img3      "python app1.py"   About a minute ago   Up About a minute   5000/tcp   unruffled_kare
+5feaf68f0644   img3      "python app.py"    5 minutes ago        Up 4 minutes        5000/tcp   wizardly_cori
+0cdb024e8e76   ubuntu    "/bin/bash"        59 minutes ago       Up 59 minutes                  con2
+[root@ip-172-31-16-139 docker_python_flask-project]# cat Dockerfile 
+FROM python:3.6
+MAINTAINER veera "veera.narni232@gmail.com"
+COPY . /app
+WORKDIR /app
+RUN pip install -r requirements.txt
+EXPOSE 5000
+ENTRYPOINT ["python"]
+CMD ["app.py"]
+#CMD ["python", "app.py"]
+[root@ip-172-31-16-139 docker_python_flask-project]# 
+
+before i build image by commenting entrypoint and cmd last but 2 lines in below file 
+[root@ip-172-31-16-139 docker_python_flask-project]# cat Dockerfile 
+FROM python:3.6
+MAINTAINER veera "veera.narni232@gmail.com"
+COPY . /app
+WORKDIR /app
+RUN pip install -r requirements.txt
+EXPOSE 5000
+#ENTRYPOINT ["python"]
+#CMD ["app.py"]
+CMD ["python", "app.py"]
+[root@ip-172-31-16-139 docker_python_flask-project]#
+
+
+NEED TO CHECK MAIN DIFFERENCE AND HANDSON WITH ENTRY POINT AND CMD with help of chatgpt along with handson 
+
+
+[root@ip-172-31-16-139 docker_python_flask-project]# docker images
+REPOSITORY   TAG       IMAGE ID       CREATED          SIZE
+img3         latest    54e682e8d410   10 minutes ago   913MB
+img1         latest    ba04f5c5b247   11 minutes ago   913MB
+ubuntu       latest    0b1ebe5dd426   2 weeks ago      78.1MB
+[root@ip-172-31-16-139 docker_python_flask-project]# docker history img1
+IMAGE          CREATED          CREATED BY                                      SIZE      COMMENT
+ba04f5c5b247   11 minutes ago   CMD ["python" "app.py"]                         0B        buildkit.dockerfile.v0
+<missing>      11 minutes ago   EXPOSE map[5000/tcp:{}]                         0B        buildkit.dockerfile.v0
+<missing>      11 minutes ago   RUN /bin/sh -c pip install -r requirements.t…   11.3MB    buildkit.dockerfile.v0
+<missing>      11 minutes ago   WORKDIR /app                                    0B        buildkit.dockerfile.v0
+<missing>      11 minutes ago   COPY . /app # buildkit                          108kB     buildkit.dockerfile.v0
+<missing>      11 minutes ago   MAINTAINER veera "veera.narni232@gmail.com"     0B        buildkit.dockerfile.v0
+<missing>      4 years ago      /bin/sh -c #(nop)  CMD ["python3"]              0B        
+<missing>      4 years ago      /bin/sh -c set -ex;   wget -O get-pip.py "$P…   8.05MB    
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PYTHON_GET_PIP_SHA256…   0B        
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PYTHON_GET_PIP_URL=ht…   0B        
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PYTHON_SETUPTOOLS_VER…   0B        
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PYTHON_PIP_VERSION=21…   0B        
+<missing>      4 years ago      /bin/sh -c cd /usr/local/bin  && ln -s idle3…   32B       
+<missing>      4 years ago      /bin/sh -c set -ex   && wget -O python.tar.x…   41.4MB    
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PYTHON_VERSION=3.6.15    0B        
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV GPG_KEY=0D96DF4D4110E…   0B        
+<missing>      4 years ago      /bin/sh -c apt-get update && apt-get install…   18.5MB    
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV LANG=C.UTF-8             0B        
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PATH=/usr/local/bin:/…   0B        
+<missing>      4 years ago      /bin/sh -c set -ex;  apt-get update;  apt-ge…   528MB     
+<missing>      4 years ago      /bin/sh -c apt-get update && apt-get install…   152MB     
+<missing>      4 years ago      /bin/sh -c set -ex;  if ! command -v gpg > /…   18.9MB    
+<missing>      4 years ago      /bin/sh -c set -eux;  apt-get update;  apt-g…   10.7MB    
+<missing>      4 years ago      /bin/sh -c #(nop)  CMD ["bash"]                 0B        
+<missing>      4 years ago      /bin/sh -c #(nop) ADD file:c03517c5ddbed4053…   124MB     
+[root@ip-172-31-16-139 docker_python_flask-project]# docker history img3
+IMAGE          CREATED          CREATED BY                                      SIZE      COMMENT
+54e682e8d410   10 minutes ago   CMD ["app.py"]                                  0B        buildkit.dockerfile.v0
+<missing>      10 minutes ago   ENTRYPOINT ["python"]                           0B        buildkit.dockerfile.v0
+<missing>      10 minutes ago   EXPOSE map[5000/tcp:{}]                         0B        buildkit.dockerfile.v0
+<missing>      10 minutes ago   RUN /bin/sh -c pip install -r requirements.t…   11.3MB    buildkit.dockerfile.v0
+<missing>      10 minutes ago   WORKDIR /app                                    0B        buildkit.dockerfile.v0
+<missing>      10 minutes ago   COPY . /app # buildkit                          108kB     buildkit.dockerfile.v0
+<missing>      10 minutes ago   MAINTAINER veera "veera.narni232@gmail.com"     0B        buildkit.dockerfile.v0
+<missing>      4 years ago      /bin/sh -c #(nop)  CMD ["python3"]              0B        
+<missing>      4 years ago      /bin/sh -c set -ex;   wget -O get-pip.py "$P…   8.05MB    
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PYTHON_GET_PIP_SHA256…   0B        
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PYTHON_GET_PIP_URL=ht…   0B        
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PYTHON_SETUPTOOLS_VER…   0B        
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PYTHON_PIP_VERSION=21…   0B        
+<missing>      4 years ago      /bin/sh -c cd /usr/local/bin  && ln -s idle3…   32B       
+<missing>      4 years ago      /bin/sh -c set -ex   && wget -O python.tar.x…   41.4MB    
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PYTHON_VERSION=3.6.15    0B        
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV GPG_KEY=0D96DF4D4110E…   0B        
+<missing>      4 years ago      /bin/sh -c apt-get update && apt-get install…   18.5MB    
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV LANG=C.UTF-8             0B        
+<missing>      4 years ago      /bin/sh -c #(nop)  ENV PATH=/usr/local/bin:/…   0B        
+<missing>      4 years ago      /bin/sh -c set -ex;  apt-get update;  apt-ge…   528MB     
+<missing>      4 years ago      /bin/sh -c apt-get update && apt-get install…   152MB     
+<missing>      4 years ago      /bin/sh -c set -ex;  if ! command -v gpg > /…   18.9MB    
+<missing>      4 years ago      /bin/sh -c set -eux;  apt-get update;  apt-g…   10.7MB    
+<missing>      4 years ago      /bin/sh -c #(nop)  CMD ["bash"]                 0B        
+<missing>      4 years ago      /bin/sh -c #(nop) ADD file:c03517c5ddbed4053…   124MB     
+[root@ip-172-31-16-139 docker_python_flask-project]# 
+
+
+
+
+
