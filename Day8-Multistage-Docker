@@ -1,0 +1,490 @@
+https://github.com/mluticloud730am/2nd10WeeksofCloudOps-main_20260502
+
+During virtualization like normal ec2 we have below steps manually 
+
+
+
+#Install Node JS
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package.json . /app/
+
+RUN npm install
+
+COPY . .
+
+npm build 
+
+run yum install httpd
+
+COPY build /httpd
+
+CMD["httpd","start"]
+
+#Build NOdeJS
+#install httpd
+#moved build package intpo httpd and nginx
+
+
+
+FROM node:18
+WORKDIR /app
+COPY . .
+RUN npm install
+RUN npm run build
+RUN npm install -g http-server
+EXPOSE 80
+CMD ["http-server","build","-p","80"]
+
+-------------------------
+
+[root@ip-172-31-45-230 client]# docker ps
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+[root@ip-172-31-45-230 client]# docker run -dt -p 81:80 image1
+46dae91c6d178026f86a8a048cc838588c2efd5f8f96cdafc8170101ccc4d4ef
+[root@ip-172-31-45-230 client]# docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED         STATUS         PORTS                               NAMES
+46dae91c6d17   image1    "docker-entrypoint.s…"   2 seconds ago   Up 2 seconds   0.0.0.0:81->80/tcp, :::81->80/tcp   beautiful_poitras
+[root@ip-172-31-45-230 client]# cat Dockerfile  --------------------------- LARGE IMAGE PROCESS 
+FROM node:18
+WORKDIR /app
+COPY . .
+RUN npm install
+RUN npm run build
+RUN npm install -g http-server
+EXPOSE 80
+CMD ["http-server","build","-p","80"]
+[root@ip-172-31-45-230 client]# 
+
+
+--------------------------------------------------
+
+
+so it is 1.45gb which includes everything build install packages and al things 
+
+Lets go with multi image first image1 is build artifcat ,image2 deploy into second image 
+now insde conatiner only httpd will run and no nodejs process required 
+
+first image is naming as build and in second image build is opying 
+
+#image1
+FROM node:18 as build #take slim version of node image
+WORKDIR /app
+COPY package.json and package-lock.json /app/
+RUN npm install
+COPY . /app/
+RUN npm run build
+#build process done 
+
+#image2
+FROM httpd
+COPY build/ /usr/local/apache2/htdocs
+CMD ["http-foreground"]
+
+
+----------------
+------------- OPTIMIZEDPROCESS 
+#STAGE 1 : Build React app
+#image1
+FROM node:18 as build #take slim version of node image
+WORKDIR /app
+COPY package.json and package-lock.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+#build process done 
+
+#Stage2 : Server with apache HTTP server 
+#image2
+FROM httpd:2.4
+#copy build output from previous stage
+COPY --from=build/ /app/build /usr/local/apache2/htdocs
+EXPOSE 80
+CMD ["http-foreground"]
+
+
+-----------------
+
+Example take this scenaior
+
+Sever 1  Maven--> mavenclean install -> build -> Jar created 
+Server 2-- tomcat installed --> we can use jar file from server 1 and can run applciation
+
+so above stage 1 and stage 2 behaves in same way 
+
+
+below is real time implemwntaion and differnece 
+
+
+[root@ip-172-31-45-230 client]# cat Dockerfile 
+#STAGE 1 : Build React app
+#image1
+FROM node:18 as build #take slim version of node image
+WORKDIR /app
+COPY package.json and package-lock.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+#build process done 
+
+#Stage2 : Server with apache HTTP server 
+#image2
+FROM httpd:2.4
+#copy build output from previous stage
+COPY --from=build/ /app/build /usr/local/apache2/htdocs
+EXPOSE 80
+CMD ["http-foreground"]
+
+[root@ip-172-31-45-230 client]# docker build -t image2 .
+[+] Building 0.0s (1/1) FINISHED                                                                                                       docker:default
+ => [internal] load build definition from Dockerfile                                                                                             0.0s
+ => => transferring dockerfile: 505B                                                                                                             0.0s
+Dockerfile:3
+--------------------
+   1 |     #STAGE 1 : Build React app
+   2 |     #image1
+   3 | >>> FROM node:18 as build #take slim version of node image
+   4 |     WORKDIR /app
+   5 |     COPY package.json and package-lock.json ./
+--------------------
+ERROR: failed to solve: dockerfile parse error on line 3: FROM requires either one or three arguments
+[root@ip-172-31-45-230 client]# 
+[root@ip-172-31-45-230 client]# 
+[root@ip-172-31-45-230 client]# 
+[root@ip-172-31-45-230 client]# vi Dockerfile 
+[root@ip-172-31-45-230 client]# cat Dockerfile 
+# STAGE 1: Build React app
+FROM node:18 AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+# STAGE 2: Serve with Apache
+FROM httpd:2.4
+
+COPY --from=build /app/build/ /usr/local/apache2/htdocs/
+
+EXPOSE 80
+
+CMD ["httpd-foreground"]
+[root@ip-172-31-45-230 client]# 
+[root@ip-172-31-45-230 client]# docker build -t image2 .
+[+] Building 51.5s (14/14) FINISHED                                                                                                    docker:default
+ => [internal] load build definition from Dockerfile                                                                                             0.0s
+ => => transferring dockerfile: 386B                                                                                                             0.0s
+ => [internal] load metadata for docker.io/library/httpd:2.4                                                                                     0.4s
+ => [internal] load metadata for docker.io/library/node:18                                                                                       0.2s
+ => [internal] load .dockerignore                                                                                                                0.0s
+ => => transferring context: 2B                                                                                                                  0.0s
+ => [build 1/6] FROM docker.io/library/node:18@sha256:c6ae79e38498325db67193d391e6ec1d224d96c693a8a4d943498556716d3783                           0.0s
+ => [stage-1 1/2] FROM docker.io/library/httpd:2.4@sha256:89a0b59e6d7285f00fc8df952a1579c31eb035cbdccb96690051e8bb6432cbea                       3.7s
+ => => resolve docker.io/library/httpd:2.4@sha256:89a0b59e6d7285f00fc8df952a1579c31eb035cbdccb96690051e8bb6432cbea                               0.0s
+ => => sha256:89a0b59e6d7285f00fc8df952a1579c31eb035cbdccb96690051e8bb6432cbea 10.14kB / 10.14kB                                                 0.0s
+ => => sha256:d20a6ad9358ed372a1f4f7c4756b40499b2002023bb0924ef7c7c6fc963594c9 7.99kB / 7.99kB                                                   0.0s
+ => => sha256:3531af2bc2a9c8883754652783cf96207d53189db279c9637b7157d034de7ecd 29.78MB / 29.78MB                                                 0.5s
+ => => sha256:5b16784cbecd5d5f8af24ffc9a81a399c31eab252795bfb0f2e5469199f8570b 2.00MB / 2.00MB                                                   0.2s
+ => => sha256:eeeb5c6dd40afcd20fe975babd9e0f75311fb4ae6a2fd473ea717a04b96d66c4 2.09kB / 2.09kB                                                   0.0s
+ => => sha256:d32ec5ee95cb99b3b76a359cc8e0c7ca0bbcbfa83f0e86c10237edbbeb248a67 145B / 145B                                                       0.1s
+ => => sha256:b267b545226ba3ec284f36692de382e4dd4a80e33362e6948d9c2c45d2e120eb 13.45MB / 13.45MB                                                 0.4s
+ => => sha256:1935f25c7dc42c04314d348d390ebe6a7fd999c4870e66da1c453ebd3fce295b 289B / 289B                                                       0.2s
+ => => sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 32B / 32B                                                         0.1s
+ => => extracting sha256:3531af2bc2a9c8883754652783cf96207d53189db279c9637b7157d034de7ecd                                                        1.9s
+ => => extracting sha256:d32ec5ee95cb99b3b76a359cc8e0c7ca0bbcbfa83f0e86c10237edbbeb248a67                                                        0.0s
+ => => extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1                                                        0.0s
+ => => extracting sha256:5b16784cbecd5d5f8af24ffc9a81a399c31eab252795bfb0f2e5469199f8570b                                                        0.2s
+ => => extracting sha256:b267b545226ba3ec284f36692de382e4dd4a80e33362e6948d9c2c45d2e120eb                                                        0.7s
+ => => extracting sha256:1935f25c7dc42c04314d348d390ebe6a7fd999c4870e66da1c453ebd3fce295b                                                        0.0s
+ => [internal] load build context                                                                                                                0.0s
+ => => transferring context: 2.95kB                                                                                                              0.0s
+ => CACHED [build 2/6] WORKDIR /app                                                                                                              0.0s
+ => [build 3/6] COPY package.json package-lock.json ./                                                                                           0.1s
+ => [build 4/6] RUN npm install                                                                                                                 33.8s
+ => [build 5/6] COPY . .                                                                                                                         0.1s
+ => [build 6/6] RUN npm run build                                                                                                               16.2s
+ => [stage-1 2/2] COPY --from=build /app/build/ /usr/local/apache2/htdocs/                                                                       0.0s
+ => exporting to image                                                                                                                           0.0s
+ => => exporting layers                                                                                                                          0.0s
+ => => writing image sha256:8fe165ad47ed74903f255b98d879e27119a6458fdfdcd2f971ddcc844251592b                                                     0.0s
+ => => naming to docker.io/library/image2                                                                                                        0.0s
+[root@ip-172-31-45-230 client]# docker images
+REPOSITORY   TAG       IMAGE ID       CREATED          SIZE
+image2       latest    8fe165ad47ed   47 seconds ago   118MB
+image1       latest    723c3d51f5b0   24 minutes ago   1.45GB
+[root@ip-172-31-45-230 client]# docker history image2
+IMAGE          CREATED          CREATED BY                                      SIZE      COMMENT
+8fe165ad47ed   56 seconds ago   CMD ["httpd-foreground"]                        0B        buildkit.dockerfile.v0
+<missing>      56 seconds ago   EXPOSE map[80/tcp:{}]                           0B        buildkit.dockerfile.v0
+<missing>      56 seconds ago   COPY /app/build/ /usr/local/apache2/htdocs/ …   1.08MB    buildkit.dockerfile.v0
+<missing>      10 days ago      CMD ["httpd-foreground"]                        0B        buildkit.dockerfile.v0
+<missing>      10 days ago      EXPOSE map[80/tcp:{}]                           0B        buildkit.dockerfile.v0
+<missing>      10 days ago      COPY httpd-foreground /usr/local/bin/ # buil…   138B      buildkit.dockerfile.v0
+<missing>      10 days ago      STOPSIGNAL SIGWINCH                             0B        buildkit.dockerfile.v0
+<missing>      10 days ago      RUN /bin/sh -c set -eux;   savedAptMark="$(a…   32.5MB    buildkit.dockerfile.v0
+<missing>      10 days ago      ENV HTTPD_PATCHES=                              0B        buildkit.dockerfile.v0
+<missing>      10 days ago      ENV HTTPD_SHA256=94d7ff2b42acbb828e870ba29e4…   0B        buildkit.dockerfile.v0
+<missing>      10 days ago      ENV HTTPD_VERSION=2.4.66                        0B        buildkit.dockerfile.v0
+<missing>      10 days ago      RUN /bin/sh -c set -eux;  apt-get install --…   5.65MB    buildkit.dockerfile.v0
+<missing>      10 days ago      WORKDIR /usr/local/apache2                      0B        buildkit.dockerfile.v0
+<missing>      10 days ago      RUN /bin/sh -c mkdir -p "$HTTPD_PREFIX"  && …   0B        buildkit.dockerfile.v0
+<missing>      10 days ago      ENV PATH=/usr/local/apache2/bin:/usr/local/s…   0B        buildkit.dockerfile.v0
+<missing>      10 days ago      ENV HTTPD_PREFIX=/usr/local/apache2             0B        buildkit.dockerfile.v0
+<missing>      11 days ago      # debian.sh --arch 'amd64' out/ 'trixie' '@1…   78.6MB    debuerreotype 0.17
+[root@ip-172-31-45-230 client]# docker history image1
+IMAGE          CREATED          CREATED BY                                      SIZE      COMMENT
+723c3d51f5b0   24 minutes ago   CMD ["http-server" "build" "-p" "80"]           0B        buildkit.dockerfile.v0
+<missing>      24 minutes ago   EXPOSE map[80/tcp:{}]                           0B        buildkit.dockerfile.v0
+<missing>      24 minutes ago   RUN /bin/sh -c npm install -g http-server # …   6.5MB     buildkit.dockerfile.v0
+<missing>      24 minutes ago   RUN /bin/sh -c npm run build # buildkit         2.88MB    buildkit.dockerfile.v0
+<missing>      25 minutes ago   RUN /bin/sh -c npm install # buildkit           353MB     buildkit.dockerfile.v0
+<missing>      25 minutes ago   COPY . . # buildkit                             1.22MB    buildkit.dockerfile.v0
+<missing>      25 minutes ago   WORKDIR /app                                    0B        buildkit.dockerfile.v0
+<missing>      13 months ago    CMD ["node"]                                    0B        buildkit.dockerfile.v0
+<missing>      13 months ago    ENTRYPOINT ["docker-entrypoint.sh"]             0B        buildkit.dockerfile.v0
+<missing>      13 months ago    COPY docker-entrypoint.sh /usr/local/bin/ # …   388B      buildkit.dockerfile.v0
+<missing>      13 months ago    RUN /bin/sh -c set -ex   && export GNUPGHOME…   5.34MB    buildkit.dockerfile.v0
+<missing>      13 months ago    ENV YARN_VERSION=1.22.22                        0B        buildkit.dockerfile.v0
+<missing>      13 months ago    RUN /bin/sh -c ARCH= && dpkgArch="$(dpkg --p…   154MB     buildkit.dockerfile.v0
+<missing>      13 months ago    ENV NODE_VERSION=18.20.8                        0B        buildkit.dockerfile.v0
+<missing>      13 months ago    RUN /bin/sh -c groupadd --gid 1000 node   &&…   8.94kB    buildkit.dockerfile.v0
+<missing>      2 years ago      RUN /bin/sh -c set -ex;  apt-get update;  ap…   588MB     buildkit.dockerfile.v0
+<missing>      2 years ago      RUN /bin/sh -c set -eux;  apt-get update;  a…   177MB     buildkit.dockerfile.v0
+<missing>      2 years ago      RUN /bin/sh -c set -eux;  apt-get update;  a…   48.4MB    buildkit.dockerfile.v0
+<missing>      2 years ago      # debian.sh --arch 'amd64' out/ 'bookworm' '…   117MB     debuerreotype 0.15
+[root@ip-172-31-45-230 client]# 
+
+---------------------------------------------------------
+
+
+1. Concept Clarity Questions
+
+👉 “In traditional setup (Maven → Tomcat), we use two servers. In Docker, both stages are inside one Dockerfile. So are stages just logical separation, not physical servers?”
+
+👉 “Does each FROM create a completely new isolated filesystem like a fresh server?”
+
+👉 “If stages are independent, how exactly does COPY --from=build work internally?”
+
+⚙️ 2. Image Size & Optimization (VERY IMPORTANT)
+
+👉 “Why is image1 1.45GB but image2 only 118MB? What exactly got removed?”
+
+👉 “Is multi-stage build mainly for reducing image size or also for security?”
+
+👉 “What happens if I don’t use multi-stage and deploy directly with Node?”
+
+👉 “When should I use node:alpine vs node:18?”
+
+🚀 3. Runtime vs Build-Time
+
+👉 “Why do we need Node.js only in Stage 1 and not in Stage 2?”
+
+👉 “What exactly is inside /app/build? Is it pure HTML/CSS/JS?”
+
+👉 “Can React app run without Node in production?”
+
+👉 “Difference between npm start vs npm run build in real deployments?”
+
+🌐 4. Web Server Choice (Critical for real-world)
+
+👉 “Why are we using Apache (httpd) here? Why not Nginx?”
+
+👉 “Which is better for React apps: Apache or Nginx and why?”
+
+👉 “Can we skip Apache and use http-server like in image1?”
+
+👉 “In production, what do companies usually use?”
+
+🔐 5. Security & Best Practices
+
+👉 “Is it a best practice to exclude build tools (Node, Maven) from final image?”
+
+👉 “How does multi-stage improve security?”
+
+👉 “Can sensitive files (like .env) accidentally go into final image?”
+
+🧠 6. Deep Docker Internals (Impress your trainer)
+
+👉 “Are intermediate stages stored as images or discarded after build?”
+
+👉 “Can I reuse a previous stage as base for another stage?”
+
+👉 “What happens if I name stages differently or don’t name them?”
+
+👉 “Is --from=build referencing container, image, or layer?”
+
+🔄 7. Real-Time Production Scenarios
+
+👉 “How would this work in CI/CD pipeline (Jenkins/GitHub Actions)?”
+
+👉 “Where does Docker cache help in this build?”
+
+👉 “If only code changes, will npm install run again?”
+
+👉 “How do we handle environment variables in React production build?”
+
+🧪 8. Troubleshooting & Edge Cases
+
+👉 “What happens if build fails in Stage 1?”
+
+👉 “Can I debug inside intermediate stage?”
+
+👉 “How to run only Stage 1 separately?”
+
+👉 “How to inspect contents of /app/build inside image?”
+
+🏁 9. Advanced Thinking (Next-Level Questions)
+
+👉 “Can we create multi-stage builds for backend apps like Spring Boot?”
+
+👉 “How does this compare with Kubernetes deployments?”
+
+👉 “Can we push only final image to Docker Hub?”
+
+👉 “Is multi-stage supported in all Docker versions?”
+
+------------------------------------
+
+ Create mysql from ec2 i got end point as database-1.c18scyiamjnw.us-east-1.rds.amazonaws.com
+
+
+[root@ip-172-31-45-230 ~]# git clone https://github.com/mluticloud730am/Java-springboot-project_1.git
+Cloning into 'Java-springboot-project_1'...
+remote: Enumerating objects: 419, done.
+remote: Counting objects: 100% (419/419), done.
+remote: Compressing objects: 100% (209/209), done.
+remote: Total 419 (delta 154), reused 418 (delta 154), pack-reused 0 (from 0)
+Receiving objects: 100% (419/419), 46.13 MiB | 48.15 MiB/s, done.
+Resolving deltas: 100% (154/154), done.
+[root@ip-172-31-45-230 ~]# cd Java-springboot-project_1/
+[root@ip-172-31-45-230 Java-springboot-project_1]# cd backend
+[root@ip-172-31-45-230 backend]# cat Dockerfile
+# Stage 1 — Build JAR
+FROM maven:3.9.9-amazoncorretto-11 AS builder
+WORKDIR /app
+COPY . /app
+RUN mvn clean package -Dspring.profiles.active=build -DskipTests
+
+# Stage 2 — Run JAR
+FROM amazoncorretto:11-alpine-jdk
+WORKDIR /app
+
+# Copy the built JAR from the builder stage
+COPY --from=builder /app/target/*.jar app.jar
+
+# Set default environment variables (can be overridden at runtime)
+ENV SPRING_DATASOURCE_URL="jdbc:mysql://database-1.ckjyc24s4jgb.us-east-1.rds.amazonaws.com:3306/datastore?createDatabaseIfNotExist=true"
+ENV SPRING_DATASOURCE_USERNAME="admin"
+ENV SPRING_DATASOURCE_PASSWORD="Cloud123"
+ENV SPRING_JPA_HIBERNATE_DDL_AUTO="update"
+ENV SERVER_PORT=8084
+
+# Expose the port (optional)
+EXPOSE 8084
+
+# Start the application
+CMD ["java", "-jar", "app.jar"]
+[root@ip-172-31-45-230 backend]# vi Dockerfile
+[root@ip-172-31-45-230 backend]# docker build -t backend .
+[+] Building 59.4s (13/13) FINISHED                                                                                                    docker:default
+ => [internal] load build definition from Dockerfile                                                                                             0.0s
+ => => transferring dockerfile: 870B                                                                                                             0.0s
+ => [internal] load metadata for docker.io/library/amazoncorretto:11-alpine-jdk                                                                  0.4s
+ => [internal] load metadata for docker.io/library/maven:3.9.9-amazoncorretto-11                                                                 0.3s
+ => [internal] load .dockerignore                                                                                                                0.0s
+ => => transferring context: 2B                                                                                                                  0.0s
+ => [builder 1/4] FROM docker.io/library/maven:3.9.9-amazoncorretto-11@sha256:cf8095886c71f61ec4ec13519c0a26a6eb325fda9aaf1a9961c11584003da603  30.2s
+ => => resolve docker.io/library/maven:3.9.9-amazoncorretto-11@sha256:cf8095886c71f61ec4ec13519c0a26a6eb325fda9aaf1a9961c11584003da603           0.0s
+ => => sha256:cf8095886c71f61ec4ec13519c0a26a6eb325fda9aaf1a9961c11584003da603 2.67kB / 2.67kB                                                   0.0s
+ => => sha256:1ff1b05ae086187acedc76a3866c2bd82735bc88423f6ef0289ac279de9be88f 2.51kB / 2.51kB                                                   0.0s
+ => => sha256:7a7407a9f50f5f3520448102fade2b59aaf3e02977d57b6bc54af9e0caceffb2 5.75kB / 5.75kB                                                   0.0s
+ => => sha256:c93eb42fc1cb8cbc6518e0c84a8b5166a23b8e065c2ea156492279ccf234ec25 62.96MB / 62.96MB                                                 1.2s
+ => => sha256:94257a018d3e9f5772f6e6292800ef2aed5b403abb6991c7db7841d955fc182c 148.30MB / 148.30MB                                               7.0s
+ => => sha256:1834b031c7cea7d46410853d02359e633473efec176f69e82ad6f6665df2e408 162.16MB / 162.16MB                                               8.7s
+ => => sha256:a430996d33b638e3e43f1778bd4dcaf5468171c9f5c6bf229913c217dd614d1d 30.09MB / 30.09MB                                                 2.1s
+ => => extracting sha256:c93eb42fc1cb8cbc6518e0c84a8b5166a23b8e065c2ea156492279ccf234ec25                                                        4.3s
+ => => sha256:eb921209a78da63d6e6e77e4c2e6a8caaa00d5c724b20540c7ba76b100af9780 9.17MB / 9.17MB                                                   2.5s
+ => => sha256:a98b476563fde4e00e9e651974c61673bd74fbc0114effab70444226fe74dba8 852B / 852B                                                       2.7s
+ => => sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 32B / 32B                                                         3.8s
+ => => sha256:2ea615f73fb3ebc1c4345abff72459cf567104fd76c2e7062baefb505c5f3ff5 158B / 158B                                                       8.7s
+ => => extracting sha256:94257a018d3e9f5772f6e6292800ef2aed5b403abb6991c7db7841d955fc182c                                                        3.2s
+ => => extracting sha256:1834b031c7cea7d46410853d02359e633473efec176f69e82ad6f6665df2e408                                                        5.8s
+ => => extracting sha256:a430996d33b638e3e43f1778bd4dcaf5468171c9f5c6bf229913c217dd614d1d                                                        1.3s
+ => => extracting sha256:eb921209a78da63d6e6e77e4c2e6a8caaa00d5c724b20540c7ba76b100af9780                                                        0.5s
+ => => extracting sha256:a98b476563fde4e00e9e651974c61673bd74fbc0114effab70444226fe74dba8                                                        0.0s
+ => => extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1                                                        0.0s
+ => => extracting sha256:2ea615f73fb3ebc1c4345abff72459cf567104fd76c2e7062baefb505c5f3ff5                                                        0.0s
+ => [stage-1 1/3] FROM docker.io/library/amazoncorretto:11-alpine-jdk@sha256:fb26f83551a9c5a27bf3483e8effc9053bf807f7a583480115acbff8135129cc   20.5s
+ => => resolve docker.io/library/amazoncorretto:11-alpine-jdk@sha256:fb26f83551a9c5a27bf3483e8effc9053bf807f7a583480115acbff8135129cc            0.0s
+ => => sha256:fb26f83551a9c5a27bf3483e8effc9053bf807f7a583480115acbff8135129cc 2.67kB / 2.67kB                                                   0.0s
+ => => sha256:a7df12ee030dbb0c9665a62aebfc34a5df02a0cb4314d14dde707f011036a8ab 1.37kB / 1.37kB                                                   0.0s
+ => => sha256:faef5fda99d34cc42fedf9e28fdf1a3ca90eb609baf76e738d8f06e776833167 2.48kB / 2.48kB                                                   0.0s
+ => => sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb 3.86MB / 3.86MB                                                   8.8s
+ => => sha256:99393aeb4996979729334549f2441c549bce4b33ff304c9e42cdc66c6103a224 143.69MB / 143.69MB                                              13.6s
+ => => extracting sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb                                                        0.2s
+ => => extracting sha256:99393aeb4996979729334549f2441c549bce4b33ff304c9e42cdc66c6103a224                                                        4.7s
+ => [internal] load build context                                                                                                                0.7s
+ => => transferring context: 53.63MB                                                                                                             0.7s
+ => [stage-1 2/3] WORKDIR /app                                                                                                                   9.5s
+ => [builder 2/4] WORKDIR /app                                                                                                                   0.0s
+ => [builder 3/4] COPY . /app                                                                                                                    0.8s
+ => [builder 4/4] RUN mvn clean package -Dspring.profiles.active=build -DskipTests                                                              26.8s
+ => [stage-1 3/3] COPY --from=builder /app/target/*.jar app.jar                                                                                  0.1s
+ => exporting to image                                                                                                                           0.4s
+ => => exporting layers                                                                                                                          0.4s
+ => => writing image sha256:1537427b644768bbd80d0a70614c046ebf5d0b96a4c26afe7ec378e4b6a29f4f                                                     0.0s
+ => => naming to docker.io/library/backend                                                                                                       0.0s
+[root@ip-172-31-45-230 backend]# docker images
+REPOSITORY   TAG       IMAGE ID       CREATED              SIZE
+backend      latest    1537427b6447   About a minute ago   336MB
+image2       latest    8fe165ad47ed   25 minutes ago       118MB
+image1       latest    723c3d51f5b0   49 minutes ago       1.45GB
+[root@ip-172-31-45-230 backend]# 
+
+
+
+[root@ip-172-31-45-230 backend]# docker run -dt -p 8085:8084 backend
+ab4e7291448c8a66b0468efa12689b00af052ce8fa8611290b15054801166e14
+[root@ip-172-31-45-230 backend]# docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS          PORTS                                       NAMES
+ab4e7291448c   backend   "java -jar app.jar"      3 seconds ago    Up 2 seconds    0.0.0.0:8085->8084/tcp, :::8085->8084/tcp   condescending_hypatia
+46dae91c6d17   image1    "docker-entrypoint.s…"   44 minutes ago   Up 44 minutes   0.0.0.0:81->80/tcp, :::81->80/tcp           beautiful_poitras
+[root@ip-172-31-45-230 backend]# docker exec -it ab4e7291448c /bin/bash
+OCI runtime exec failed: exec failed: unable to start container process: exec: "/bin/bash": stat /bin/bash: no such file or directory: unknown
+[root@ip-172-31-45-230 backend]# docker exec -it ab4e7291448c /bin/sh
+/app # ps aux
+PID   USER     TIME  COMMAND
+    1 root      0:12 java -jar app.jar
+   37 root      0:00 /bin/sh
+   43 root      0:00 ps aux
+/app # 
+
+
+
+/app # [root@ip-172-31-45-230 backend]# exit
+logout
+[ec2-user@ip-172-31-45-230 ~]$ docker ps
+permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Get "http://%2Fvar%2Frun%2Fdocker.sock/v1.44/containers/json": dial unix /var/run/docker.sock: connect: permission denied
+[ec2-user@ip-172-31-45-230 ~]$ sudo su -
+Last login: Sat May  2 02:34:05 UTC 2026 on pts/1
+[root@ip-172-31-45-230 ~]# docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS          PORTS                               NAMES
+46dae91c6d17   image1    "docker-entrypoint.s…"   46 minutes ago   Up 46 minutes   0.0.0.0:81->80/tcp, :::81->80/tcp   beautiful_poitras
+[root@ip-172-31-45-230 ~]# 
+
+
+-----------------------
+
+
+IMPORTANT DOCKER File CReation , DOcker optimization ,docker troubleshooting neexd to check tjsi 
+
+
+
+
+
